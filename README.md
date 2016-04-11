@@ -63,13 +63,13 @@ $ make install
 
 # Usage
 
-To run executable `exec` and to save the trace data to `exec.trace`, use
+To run executable `exec` and to save the trace data to `exec.frames`, use
 
 ```bash
-$ qemu-arm -tracefile exec.trace exec # trace ARM target executable
-$ qemu-i386 -tracefile exec.trace exec # trace X86 target executable
-$ qemu-x86_64 -tracefile exec.trace exec # trace X86-64 target executable
-$ qemu-mips -tracefile exec.trace exec # trace MIPS target executable
+$ qemu-arm -tracefile exec.frames exec # trace ARM target executable
+$ qemu-i386 -tracefile exec.frames exec # trace X86 target executable
+$ qemu-x86_64 -tracefile exec.frames exec # trace X86-64 target executable
+$ qemu-mips -tracefile exec.frames exec # trace MIPS target executable
 ```
 
 Hints: use option -L to set the elf interpreter prefix to 'path'. Use
