@@ -32,6 +32,11 @@ static uint64_t toc_num_frames = 0;
 static guchar target_md5[MD5LEN];
 static char target_path[PATH_MAX] = "unknown";
 
+static void *target_state;
+
+void *state(void)  { return target_state; }   
+void set_state(void *state) { target_state = state; }
+
 
 #define WRITE(x) do {                                   \
         if (!file)                                      \

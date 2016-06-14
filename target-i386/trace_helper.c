@@ -1,10 +1,6 @@
 #include <stdint.h>
 
-#include "cpu.h"
-#include "helper.h"
-#include "tracewrap.h"
-#include "qemu/log.h"
-
+#include "trace_helper_x86.h"
 
 static const char* const regs[CPU_NB_REGS] = {
 #ifdef TARGET_X86_64
@@ -127,17 +123,6 @@ void HELPER(trace_load_eflags)(CPUArchState *env)
     qemu_trace_add_operand(oi, 0x1);
 }
 
-void HELPER(trace_store_eflags)(CPUArchState *env)
-{
-    uint32_t val = cpu_compute_eflags(env);
-
-    OperandInfo *oi = load_store_reg(REG_EFLAGS, val, 1);
-
-    //OperandInfo *oi = load_store_reg(REG_EFLAGS, cpu_compute_eflags(env), 1);
-
-    qemu_trace_add_operand(oi, 0x2);
-}
-
 OperandInfo * load_store_mem(target_ulong addr, target_ulong val, int ls, int len)
 {
     MemOperand * mo = g_new(MemOperand, 1);
@@ -183,4 +168,73 @@ void HELPER(trace_st)(CPUArchState *env, target_ulong val, target_ulong addr)
     OperandInfo *oi = load_store_mem(addr, val, 1, sizeof(val));
 
     qemu_trace_add_operand(oi, 0x2);
+}
+
+
+OperandInfo * store_flag(short val, const char *reg_name)
+{
+    RegOperand * ro = g_new(RegOperand, 1);
+    reg_operand__init(ro);
+        
+    ro->name = g_strdup(reg_name);
+    strcpy(ro->name, reg_name);
+
+    OperandInfoSpecific *ois = g_new(OperandInfoSpecific, 1);
+    operand_info_specific__init(ois);
+    ois->reg_operand = ro;
+
+    OperandUsage *ou = g_new(OperandUsage, 1);
+    operand_usage__init(ou);
+    ou->written = 1;
+    OperandInfo *oi = g_new(OperandInfo, 1);
+    operand_info__init(oi);
+    oi->bit_length = 1;
+    oi->operand_info_specific = ois;
+    oi->operand_usage = ou;
+    oi->value.len = 1;
+    oi->value.data = g_malloc(oi->value.len);
+    memcpy(oi->value.data, &val, 1);
+    return oi;
+}
+
+bool is_flag_changed(x86_flags_t old_flags, x86_flags_t flags, x86_flags_t mask) {
+    return (old_flags & mask) != (flags & mask);
+}
+
+short flag_value(x86_flags_t flags, x86_flags_t mask) {
+    if ((flags & mask) == mask) return 1;
+    else return 0;
+}
+
+void store_if_changed(x86_flags_t old_flags, x86_flags_t flags, x86_flags_t mask, const char *reg_name) {
+    if (is_flag_changed(old_flags, flags, mask)) {
+        OperandInfo *oi = store_flag(flag_value(flags, mask), reg_name);
+        qemu_trace_add_operand(oi, 0x2);
+    }
+}
+
+void set_x86_flags(x86_flags_t flags) {
+    memcpy(state(), &flags, sizeof(x86_flags_t));
+}
+
+x86_flags_t x86_flags(void) {
+    x86_flags_t flags = 0;
+    if (state() == NULL) { 
+        void *state = g_malloc(sizeof(x86_flags_t));
+        set_state(state);
+    } else {
+        memcpy(&flags, state(), sizeof(x86_flags_t));
+    }
+    return flags;
+}
+
+void HELPER(trace_store_eflags)(CPUArchState *env)
+{
+    x86_flags_t old_flags = x86_flags();
+    x86_flags_t flags = cpu_compute_eflags(env);
+    set_x86_flags(flags);
+    store_if_changed(old_flags, flags, CC_C, "CF");
+    store_if_changed(old_flags, flags, CC_O, "VF");
+    store_if_changed(old_flags, flags, CC_Z, "ZF");
+    store_if_changed(old_flags, flags, CC_S, "NF");
 }

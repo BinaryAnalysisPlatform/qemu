@@ -43,6 +43,9 @@ void qemu_trace_finish(uint32_t exit_code);
 OperandInfo * load_store_reg(target_ulong reg, target_ulong val, int ls);
 OperandInfo * load_store_mem(target_ulong addr, target_ulong val, int ls, int len);
 
+void *state(void);
+void set_state(void *state);
+
 #define REG_EFLAGS 66
 #define REG_LO 33
 #define REG_HI 34
