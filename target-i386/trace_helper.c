@@ -89,7 +89,7 @@ OperandInfo * load_store_reg(target_ulong reg, target_ulong val, int ls) {
     }
     OperandInfo *oi = g_new(OperandInfo,1);
     operand_info__init(oi);
-    oi->bit_length = 0;
+    oi->bit_length = sizeof(val) * 8;
     oi->operand_info_specific = ois;
     oi->operand_usage = ou;
     oi->value.len = sizeof(val);

@@ -85,7 +85,7 @@ OperandInfo * load_store_reg(uint32_t reg, uint32_t val, int ls) {
     }
     OperandInfo *oi = g_new(OperandInfo, 1);
     operand_info__init(oi);
-    oi->bit_length = 0;
+    oi->bit_length = sizeof(val) * 8;
     oi->operand_info_specific = ois;
     oi->operand_usage = ou;
     oi->value.len = 4;
