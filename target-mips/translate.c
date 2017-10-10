@@ -2176,6 +2176,13 @@ static void gen_logic_imm(DisasContext *ctx, uint32_t opc,
         return;
     }
     uimm = (uint16_t)imm;
+
+#ifdef HAS_TRACEWRAP
+    TCGv trs = tcg_const_i32(rs);
+    gen_helper_trace_load_reg(trs, cpu_gpr[rs]);
+    tcg_temp_free(trs);
+#endif //HAS_TRACEWRAP
+
     switch (opc) {
     case OPC_ANDI:
         if (likely(rs != 0))
@@ -2210,6 +2217,11 @@ static void gen_logic_imm(DisasContext *ctx, uint32_t opc,
         MIPS_DEBUG("Unknown logical immediate opcode %08x", opc);
         break;
     }
+#ifdef HAS_TRACEWRAP
+    TCGv trt = tcg_const_i32(rt);
+    gen_helper_trace_store_reg(trt, cpu_gpr[rt]);
+    tcg_temp_free(trt);
+#endif //HAS_TRACEWRAP
 }
 
 /* Set on less than with immediate operand */
