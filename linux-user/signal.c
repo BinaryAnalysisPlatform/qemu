@@ -30,6 +30,10 @@
 #include "qemu-common.h"
 #include "target_signal.h"
 
+#ifdef HAS_TRACEWRAP
+#include "tracewrap.h"
+#endif //HAS_TRACEWRAP
+
 //#define DEBUG_SIGNAL
 
 static struct target_sigaltstack target_sigaltstack_used = {
@@ -447,6 +451,10 @@ static void QEMU_NORETURN force_sig(int target_sig)
     struct sigaction act;
     host_sig = target_to_host_signal(target_sig);
     gdb_signalled(env, target_sig);
+
+    #ifdef HAS_TRACEWRAP
+      qemu_trace_finish(-target_sig);
+    #endif //HAS_TRACEWRAP
 
     /* dump core if supported by target binary format */
     if (core_dump_signal(target_sig) && (ts->bprm->core_dump != NULL)) {
