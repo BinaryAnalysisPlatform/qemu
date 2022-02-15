@@ -5,6 +5,7 @@
 #include <glib.h>
 #include <err.h>
 #include "qemu/log.h"
+#include "qemu-version.h"
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -15,7 +16,7 @@
 
 
 char tracer_name[] = "qemu";
-char tracer_version[] = "2.0.0/tracewrap";
+char tracer_version[] = QEMU_FULL_VERSION;
 
 static Frame * g_frame;
 static uint64_t frames_per_toc_entry = 64LL;
