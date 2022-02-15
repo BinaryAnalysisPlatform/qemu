@@ -4,7 +4,7 @@ set -eu
 
 dir="$1"
 pkgversion="$2"
-version="$3"
+version="$3-tracewrap"
 
 if [ -z "$pkgversion" ]; then
     cd "$dir"
