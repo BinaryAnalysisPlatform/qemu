@@ -260,3 +260,7 @@ void HELPER(trace_st64)(CPUARMState *env, uint64_t val, uint32_t addr, uint32_t 
     OperandInfo *oi = load_store_mem(addr, 1, &val, len);
     qemu_trace_add_operand(oi, 0x2);
 }
+
+void HELPER(trace_mode)(void *mode) {
+    qemu_trace_set_mode(mode);
+}

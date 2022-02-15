@@ -73,6 +73,7 @@ DEF_HELPER_3(trace_cpsr_write, void, env, i32, i32)
 DEF_HELPER_1(trace_cpsr_read, i32, env)
 DEF_HELPER_1(log_read_cpsr, void, env)
 DEF_HELPER_1(log_store_cpsr, void, env)
+DEF_HELPER_1(trace_mode, void, ptr)
 #endif //HAS_TRACEWRAP
 
 DEF_HELPER_3(v7m_msr, void, env, i32, i32)

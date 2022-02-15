@@ -317,6 +317,13 @@ void qemu_trace_add_operand(OperandInfo *oi, int inout) {
     ol->elem[ol->n_elem - 1] = oi;
 }
 
+void qemu_trace_set_mode(const char *mode_str) {
+    if (!open_frame) {
+        return;
+    }
+    g_frame->std_frame->mode = (char *)mode_str;
+}
+
 void qemu_trace_endframe(CPUArchState *env, target_ulong pc, target_ulong size) {
     int i = 0;
     StdFrame *sframe = g_frame->std_frame;

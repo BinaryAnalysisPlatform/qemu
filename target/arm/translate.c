@@ -67,6 +67,7 @@ static const char * const regnames[] =
 
 
 #ifdef HAS_TRACEWRAP
+#include <frame_arch.h>
 /* Set to 1 if cpsr contents have already been written for the current instruction. */
 static int loaded_cpsr = 0;
 /* Set to 1 if an instruction affects cpsr. */
@@ -2672,6 +2673,9 @@ static inline void gen_trace_newframe(DisasContext *s)
     TCGv t = tcg_const_i32(s->pc_curr);
     gen_helper_trace_newframe(t);
     tcg_temp_free(t);
+    TCGv_ptr mt = tcg_const_ptr(s->thumb ? FRAME_MODE_ARM_T32 : FRAME_MODE_ARM_A32);
+    gen_helper_trace_mode(mt);
+    tcg_temp_free_ptr(mt);
     trace_instr_state_reset();
 }
 

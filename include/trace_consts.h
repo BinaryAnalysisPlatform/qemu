@@ -10,4 +10,4 @@ const uint64_t bfd_machine_offset = 24LL;
 const uint64_t num_trace_frames_offset = 32LL;
 const uint64_t toc_offset_offset = 40LL;
 const uint64_t first_frame_offset = 48LL;
-const uint64_t out_trace_version = 2LL;
+const uint64_t out_trace_version = 3LL;

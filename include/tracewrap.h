@@ -9,7 +9,6 @@
 
 #include "frame.piqi.pb-c.h"
 
-
 /** initializes trace subsystem.
 
     All pointers are owned by the caller.
@@ -39,6 +38,7 @@ void qemu_trace_init(const char *filename, const char *targetname,
                      char **target_envp);
 void qemu_trace_newframe(target_ulong addr, int tread_id);
 void qemu_trace_add_operand(OperandInfo *oi, int inout);
+void qemu_trace_set_mode(const char *mode_str);
 void qemu_trace_endframe(CPUArchState *env, target_ulong pc, target_ulong size);
 void qemu_trace_finish(uint32_t exit_code);
 
