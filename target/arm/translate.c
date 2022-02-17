@@ -2656,6 +2656,7 @@ static inline void gen_trace_newframe(DisasContext *s)
     TCGv t = tcg_const_i32(s->pc_curr);
     gen_helper_trace_newframe(t);
     tcg_temp_free(t);
+    trace_instr_state_reset();
 }
 
 static inline void gen_trace_store_cpsr(void)
@@ -9233,9 +9234,6 @@ static void disas_arm_insn(DisasContext *s, unsigned int insn)
 {
     unsigned int cond = insn >> 28;
 
-#ifdef HAS_TRACEWRAP
-    trace_instr_state_reset();
-#endif //HAS_TRACEWRAP
     s->insn_size = 4;
 
     /* M variants do not implement ARM mode; this must raise the INVSTATE
