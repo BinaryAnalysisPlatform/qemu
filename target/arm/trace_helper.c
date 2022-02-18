@@ -115,7 +115,7 @@ void HELPER(log_store_cpsr)(CPUARMState *env)
 	oi = load_store_reg(REG_QF, (val >> 27) & 0x1, 1);
     qemu_trace_add_operand(oi, 0x2);
 
-	oi = load_store_reg(REG_GE, (val >> 19) & 0xF, 1);
+	oi = load_store_reg(REG_GE, (val >> 16) & 0xF, 1);
     qemu_trace_add_operand(oi, 0x2);
 }
 
@@ -139,7 +139,7 @@ void HELPER(log_read_cpsr)(CPUARMState *env)
 	oi = load_store_reg(REG_QF, (val >> 27) & 0x1, 0);
     qemu_trace_add_operand(oi, 0x1);
 
-	oi = load_store_reg(REG_GE, (val >> 19) & 0xF, 0);
+	oi = load_store_reg(REG_GE, (val >> 16) & 0xF, 0);
     qemu_trace_add_operand(oi, 0x1);
 }
 

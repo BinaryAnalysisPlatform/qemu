@@ -7861,6 +7861,10 @@ static bool trans_SEL(DisasContext *s, arg_rrr *a)
         return false;
     }
 
+#ifdef HAS_TRACEWRAP
+    trace_read_cpsr();
+#endif
+
     t1 = load_reg(s, a->rn);
     t2 = load_reg(s, a->rm);
     t3 = tcg_temp_new_i32();
