@@ -791,7 +791,9 @@ void arm_test_cc(DisasCompare *cmp, int cc)
         cond = tcg_invert_cond(cond);
     }
 
+#ifdef HAS_TRACEWRAP
     trace_read_cpsr();
+#endif
 
  no_invert:
     cmp->cond = cond;
@@ -9842,6 +9844,10 @@ static void thumb_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
         dc->insn_eci_rewind = tcg_last_op();
     }
 
+#ifdef HAS_TRACEWRAP
+    gen_trace_newframe(dc);
+#endif //HAS_TRACEWRAP
+
     if (dc->condexec_mask && !thumb_insn_is_unconditional(dc, insn)) {
         uint32_t cond = dc->condexec_cond;
 
@@ -9854,9 +9860,6 @@ static void thumb_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
         }
     }
 
-#ifdef HAS_TRACEWRAP
-    gen_trace_newframe(dc);
-#endif //HAS_TRACEWRAP
     if (is_16bit) {
         disas_thumb_insn(dc, insn);
     } else {
