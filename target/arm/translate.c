@@ -8515,7 +8515,7 @@ static bool trans_BLX_i(DisasContext *s, arg_BLX_i *a)
     int32_t lr = s->base.pc_next | s->thumb;
 #ifdef HAS_TRACEWRAP
     TCGv t = tcg_constant_i32(lr);
-    gen_trace_store_reg(4, t);
+    gen_trace_store_reg(14, t);
     tcg_temp_free(t);
 #endif
     tcg_gen_movi_i32(cpu_R[14], lr);
