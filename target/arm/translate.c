@@ -5201,6 +5201,15 @@ static void gen_store_exclusive(DisasContext *s, int rd, int rt, int rt2,
 
         tcg_gen_atomic_cmpxchg_i64(o64, taddr, cpu_exclusive_val, n64,
                                    get_mem_index(s), opc);
+#ifdef HAS_TRACEWRAP
+        TCGv mot = tcg_const_i32(opc);
+        gen_helper_trace_st(cpu_env, t1, taddr, mot);
+        TCGv taddr2 = tcg_temp_new_i32();
+        tcg_gen_addi_i32(taddr2, taddr, 4);
+        gen_helper_trace_st(cpu_env, t2, taddr2, mot);
+        tcg_temp_free(taddr2);
+        tcg_temp_free(mot);
+#endif //HAS_TRACEWRAP
         tcg_temp_free_i64(n64);
 
         tcg_gen_setcond_i64(TCG_COND_NE, o64, o64, cpu_exclusive_val);
@@ -5211,17 +5220,30 @@ static void gen_store_exclusive(DisasContext *s, int rd, int rt, int rt2,
         t2 = tcg_temp_new_i32();
         tcg_gen_extrl_i64_i32(t2, cpu_exclusive_val);
         tcg_gen_atomic_cmpxchg_i32(t0, taddr, t2, t1, get_mem_index(s), opc);
+#ifdef HAS_TRACEWRAP
+        TCGv mot = tcg_const_i32(opc);
+        gen_helper_trace_st(cpu_env, t1, taddr, mot);
+        tcg_temp_free(mot);
+#endif //HAS_TRACEWRAP
         tcg_gen_setcond_i32(TCG_COND_NE, t0, t0, t2);
         tcg_temp_free_i32(t2);
     }
     tcg_temp_free_i32(t1);
     tcg_temp_free(taddr);
     tcg_gen_mov_i32(cpu_R[rd], t0);
+#ifdef HAS_TRACEWRAP
+    gen_trace_store_reg(rd, t0);
+#endif //HAS_TRACEWRAP
     tcg_temp_free_i32(t0);
     tcg_gen_br(done_label);
 
     gen_set_label(fail_label);
     tcg_gen_movi_i32(cpu_R[rd], 1);
+#ifdef HAS_TRACEWRAP
+    TCGv_i32 tmp = tcg_const_i32(1);
+    gen_trace_store_reg(rd, tmp);
+    tcg_temp_free_i32(tmp);
+#endif //HAS_TRACEWRAP
     gen_set_label(done_label);
     tcg_gen_movi_i64(cpu_exclusive_addr, -1);
 }
