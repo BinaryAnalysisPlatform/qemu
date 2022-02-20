@@ -6259,6 +6259,10 @@ static bool op_qaddsub(DisasContext *s, arg_rrr *a, bool add, bool doub)
     } else {
         gen_helper_sub_saturate(t0, cpu_env, t0, t1);
     }
+#ifdef HAS_TRACEWRAP
+    trace_read_cpsr();
+    trace_store_cpsr();
+#endif
     tcg_temp_free_i32(t1);
     store_reg(s, a->rd, t0);
     return true;
