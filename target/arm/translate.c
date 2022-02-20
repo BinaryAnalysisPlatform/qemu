@@ -6539,6 +6539,9 @@ static bool trans_MRS_reg(DisasContext *s, arg_MRS_reg *a)
     } else {
         tmp = tcg_temp_new_i32();
         gen_helper_cpsr_read(tmp, cpu_env);
+#ifdef HAS_TRACEWRAP
+        trace_read_cpsr();
+#endif
     }
     store_reg(s, a->rd, tmp);
     return true;
@@ -6556,6 +6559,10 @@ static bool trans_MSR_reg(DisasContext *s, arg_MSR_reg *a)
     if (gen_set_psr(s, mask, a->r, tmp)) {
         unallocated_encoding(s);
     }
+#ifdef HAS_TRACEWRAP
+    trace_read_cpsr();
+    trace_store_cpsr();
+#endif
     return true;
 }
 
