@@ -80,6 +80,7 @@ void HELPER(trace_store_reg)(uint32_t reg, uint32_t val)
 //}
 //
 
+// TODO: signature has changed, see arm
 OperandInfo * load_store_mem(uint32_t addr, uint32_t val, int ls, int len) {
     MemOperand * mo = g_new(MemOperand,1);
     mem_operand__init(mo);

@@ -1091,12 +1091,18 @@ void gen_aa32_ld_i64(DisasContext *s, TCGv_i64 val, TCGv_i32 a32,
                      int index, MemOp opc)
 {
     gen_aa32_ld_internal_i64(s, val, a32, index, finalize_memop(s, opc));
+    TCGv t = tcg_const_i32(opc);
+    gen_helper_trace_ld64(cpu_env, val, a32, t);
+    tcg_temp_free(t);
 }
 
 void gen_aa32_st_i64(DisasContext *s, TCGv_i64 val, TCGv_i32 a32,
                      int index, MemOp opc)
 {
     gen_aa32_st_internal_i64(s, val, a32, index, finalize_memop(s, opc));
+    TCGv t = tcg_const_i32(opc);
+    gen_helper_trace_st64(cpu_env, val, a32, t);
+    tcg_temp_free(t);
 }
 
 #define DO_GEN_LD(SUFF, OPC)                                            \

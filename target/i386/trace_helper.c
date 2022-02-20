@@ -138,6 +138,7 @@ void HELPER(trace_store_eflags)(CPUArchState *env)
     qemu_trace_add_operand(oi, 0x2);
 }
 
+// TODO: signature has changed, see arm
 OperandInfo * load_store_mem(target_ulong addr, target_ulong val, int ls, int len)
 {
     MemOperand * mo = g_new(MemOperand, 1);
