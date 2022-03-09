@@ -584,4 +584,48 @@ static inline MemOp finalize_memop(DisasContext *s, MemOp opc)
  */
 uint64_t asimd_imm_const(uint32_t imm, int cmode, int op);
 
+#ifdef HAS_TRACEWRAP
+// Mask of TRACE_CPSR_* bits of which flags have already been created as read operands
+extern uint32_t loaded_cpsr;
+// Mask of TRACE_CPSR_* bits of which flags should be created as write operands when ending the frame
+extern uint32_t store_cpsr;
+
+static inline void trace_cpsr_reset(void)
+{
+    loaded_cpsr = 0;
+    store_cpsr = 0;
+}
+
+static inline void trace_read_cpsr(uint32_t mask)
+{
+    uint32_t new_flags = mask & ~loaded_cpsr;
+    if (!new_flags) {
+        return;
+    }
+    TCGv_i32 t = tcg_const_i32(new_flags);
+    gen_helper_trace_read_cpsr(cpu_env, t);
+    tcg_temp_free_i32(t);
+    loaded_cpsr |= mask;
+}
+
+static inline void trace_store_cpsr(uint32_t mask)
+{
+    store_cpsr |= mask;
+}
+
+static inline void gen_trace_flush_cpsr(void)
+{
+    if (!store_cpsr) {
+        return;
+    }
+    TCGv_i32 t = tcg_const_i32(store_cpsr);
+    gen_helper_trace_store_cpsr(cpu_env, t);
+    tcg_temp_free_i32(t);
+    store_cpsr = 0;
+}
+#else //HAS_TRACEWRAP
+static inline void trace_read_cpsr(uint32_t mask) {}
+static inline void trace_store_cpsr(uint32_t mask) {}
+#endif //HAS_TRACEWRAP
+
 #endif /* TARGET_ARM_TRANSLATE_H */

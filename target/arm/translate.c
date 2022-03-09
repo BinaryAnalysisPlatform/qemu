@@ -68,10 +68,8 @@ static const char * const regnames[] =
 
 #ifdef HAS_TRACEWRAP
 #include <frame_arch.h>
-/* Set to 1 if cpsr contents have already been written for the current instruction. */
-static int loaded_cpsr = 0;
-/* Set to 1 if an instruction affects cpsr. */
-static int store_cpsr = 0;
+uint32_t loaded_cpsr = 0;
+uint32_t store_cpsr = 0;
 #endif //HAS_TRACEWRAP
 
 /* initialize TCG globals.  */
@@ -263,36 +261,28 @@ static uint32_t read_pc(DisasContext *s)
 #ifdef HAS_TRACEWRAP
 static void gen_trace_load_reg(int reg, TCGv_i32 var)
 {
-    TCGv t = tcg_const_i32(reg);
+    TCGv_i32 t = tcg_const_i32(reg);
     gen_helper_trace_load_reg(t, var);
-    tcg_temp_free(t);
+    tcg_temp_free_i32(t);
 }
 
 static void gen_trace_store_reg(int reg, TCGv_i32 var)
 {
-    TCGv t = tcg_const_i32(reg);
+    TCGv_i32 t = tcg_const_i32(reg);
     gen_helper_trace_store_reg(t, var);
-    tcg_temp_free(t);
+    tcg_temp_free_i32(t);
 }
 
-static void trace_read_cpsr(void)
+// Deprecated, use trace_store_cpsr_all() with a fine-grained mask
+static void trace_read_cpsr_all(void)
 {
-    if (loaded_cpsr) {
-        return;
-    }
-    gen_helper_log_read_cpsr(cpu_env);
-    loaded_cpsr = 1;
+    trace_read_cpsr(TRACE_CPSR_ALL);
 }
 
-static void trace_store_cpsr(void)
+// Deprecated, use trace_store_cpsr_all() with a fine-grained mask
+static void trace_store_cpsr_all(void)
 {
-    store_cpsr = 1;
-}
-
-static void trace_instr_state_reset(void)
-{
-    loaded_cpsr = 0;
-    store_cpsr = 0;
+    trace_store_cpsr(TRACE_CPSR_ALL);
 }
 #endif //HAS_TRACEWRAP
 
@@ -321,7 +311,7 @@ TCGv_i32 add_reg_for_lit(DisasContext *s, int reg, int ofs)
     if (reg == 15) {
         tcg_gen_movi_i32(tmp, (read_pc(s) & ~3) + ofs);
 #ifdef HAS_TRACEWRAP
-        TCGv pc_tmp = tcg_const_i32(read_pc(s));
+        TCGv_i32 pc_tmp = tcg_const_i32(read_pc(s));
         gen_trace_load_reg(reg, pc_tmp);
         tcg_temp_free_i32(pc_tmp);
 #endif //HAS_TRACEWRAP
@@ -484,8 +474,8 @@ static void gen_add16(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 static inline void gen_logic_CC(TCGv_i32 var)
 {
 #ifdef HAS_TRACEWRAP
-    trace_read_cpsr();
-    trace_store_cpsr();
+    trace_read_cpsr_all();
+    trace_store_cpsr_all();
 #endif //HAS_TRACEWRAP
     tcg_gen_mov_i32(cpu_NF, var);
     tcg_gen_mov_i32(cpu_ZF, var);
@@ -495,7 +485,7 @@ static inline void gen_logic_CC(TCGv_i32 var)
 static void gen_add_carry(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 {
 #ifdef HAS_TRACEWRAP
-    trace_read_cpsr();
+    trace_read_cpsr_all();
 #endif //HAS_TRACEWRAP
     tcg_gen_add_i32(dest, t0, t1);
     tcg_gen_add_i32(dest, dest, cpu_CF);
@@ -505,7 +495,7 @@ static void gen_add_carry(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 static void gen_sub_carry(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 {
 #ifdef HAS_TRACEWRAP
-    trace_read_cpsr();
+    trace_read_cpsr_all();
 #endif //HAS_TRACEWRAP
     tcg_gen_sub_i32(dest, t0, t1);
     tcg_gen_add_i32(dest, dest, cpu_CF);
@@ -516,8 +506,8 @@ static void gen_sub_carry(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 static void gen_add_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 {
 #ifdef HAS_TRACEWRAP
-    trace_read_cpsr();
-    trace_store_cpsr();
+    trace_read_cpsr_all();
+    trace_store_cpsr_all();
 #endif //HAS_TRACEWRAP
     TCGv_i32 tmp = tcg_temp_new_i32();
     tcg_gen_movi_i32(tmp, 0);
@@ -534,8 +524,8 @@ static void gen_add_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 static void gen_adc_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 {
 #ifdef HAS_TRACEWRAP
-    trace_read_cpsr();
-    trace_store_cpsr();
+    trace_read_cpsr_all();
+    trace_store_cpsr_all();
 #endif //HAS_TRACEWRAP
     TCGv_i32 tmp = tcg_temp_new_i32();
     if (TCG_TARGET_HAS_add2_i32) {
@@ -566,8 +556,8 @@ static void gen_adc_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 static void gen_sub_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 {
 #ifdef HAS_TRACEWRAP
-    trace_read_cpsr();
-    trace_store_cpsr();
+    trace_read_cpsr_all();
+    trace_store_cpsr_all();
 #endif //HAS_TRACEWRAP
     TCGv_i32 tmp;
     tcg_gen_sub_i32(cpu_NF, t0, t1);
@@ -631,8 +621,8 @@ static inline void gen_arm_shift_im(TCGv_i32 var, int shiftop,
                                     int shift, int flags)
 {
 #ifdef HAS_TRACEWRAP
-    trace_read_cpsr();
-    trace_store_cpsr();
+    trace_read_cpsr_all();
+    trace_store_cpsr_all();
 #endif //HAS_TRACEWRAP
     switch (shiftop) {
     case 0: /* LSL */
@@ -718,29 +708,34 @@ void arm_test_cc(DisasCompare *cmp, int cc)
     TCGCond cond;
     bool global = true;
 
+    uint32_t cpsr_mask = 0;
     switch (cc) {
     case 0: /* eq: Z */
     case 1: /* ne: !Z */
         cond = TCG_COND_EQ;
         value = cpu_ZF;
+        cpsr_mask = TRACE_CPSR_ZF;
         break;
 
     case 2: /* cs: C */
     case 3: /* cc: !C */
         cond = TCG_COND_NE;
         value = cpu_CF;
+        cpsr_mask = TRACE_CPSR_CF;
         break;
 
     case 4: /* mi: N */
     case 5: /* pl: !N */
         cond = TCG_COND_LT;
         value = cpu_NF;
+        cpsr_mask = TRACE_CPSR_NF;
         break;
 
     case 6: /* vs: V */
     case 7: /* vc: !V */
         cond = TCG_COND_LT;
         value = cpu_VF;
+        cpsr_mask = TRACE_CPSR_VF;
         break;
 
     case 8: /* hi: C && !Z */
@@ -752,6 +747,7 @@ void arm_test_cc(DisasCompare *cmp, int cc)
            ZF is non-zero for !Z; so AND the two subexpressions.  */
         tcg_gen_neg_i32(value, cpu_CF);
         tcg_gen_and_i32(value, value, cpu_ZF);
+        cpsr_mask = TRACE_CPSR_CF | TRACE_CPSR_ZF;
         break;
 
     case 10: /* ge: N == V -> N ^ V == 0 */
@@ -761,6 +757,7 @@ void arm_test_cc(DisasCompare *cmp, int cc)
         value = tcg_temp_new_i32();
         global = false;
         tcg_gen_xor_i32(value, cpu_VF, cpu_NF);
+        cpsr_mask = TRACE_CPSR_VF | TRACE_CPSR_NF;
         break;
 
     case 12: /* gt: !Z && N == V */
@@ -773,6 +770,7 @@ void arm_test_cc(DisasCompare *cmp, int cc)
         tcg_gen_xor_i32(value, cpu_VF, cpu_NF);
         tcg_gen_sari_i32(value, value, 31);
         tcg_gen_andc_i32(value, cpu_ZF, value);
+        cpsr_mask = TRACE_CPSR_VF | TRACE_CPSR_NF | TRACE_CPSR_ZF;
         break;
 
     case 14: /* always */
@@ -793,7 +791,9 @@ void arm_test_cc(DisasCompare *cmp, int cc)
     }
 
 #ifdef HAS_TRACEWRAP
-    trace_read_cpsr();
+    trace_read_cpsr(cpsr_mask);
+#else
+    (void)cpsr_mask;
 #endif
 
  no_invert:
@@ -1075,9 +1075,9 @@ void gen_aa32_ld_i32(DisasContext *s, TCGv_i32 val, TCGv_i32 a32,
 {
     gen_aa32_ld_internal_i32(s, val, a32, index, finalize_memop(s, opc));
 #ifdef HAS_TRACEWRAP
-    TCGv t = tcg_const_i32(opc);
+    TCGv_i32 t = tcg_const_i32(opc);
     gen_helper_trace_ld(cpu_env, val, a32, t);
-    tcg_temp_free(t);
+    tcg_temp_free_i32(t);
 #endif
 }
 
@@ -1086,9 +1086,9 @@ void gen_aa32_st_i32(DisasContext *s, TCGv_i32 val, TCGv_i32 a32,
 {
     gen_aa32_st_internal_i32(s, val, a32, index, finalize_memop(s, opc));
 #ifdef HAS_TRACEWRAP
-    TCGv t = tcg_const_i32(opc);
+    TCGv_i32 t = tcg_const_i32(opc);
     gen_helper_trace_st(cpu_env, val, a32, t);
-    tcg_temp_free(t);
+    tcg_temp_free_i32(t);
 #endif
 }
 
@@ -1097,9 +1097,9 @@ void gen_aa32_ld_i64(DisasContext *s, TCGv_i64 val, TCGv_i32 a32,
 {
     gen_aa32_ld_internal_i64(s, val, a32, index, finalize_memop(s, opc));
 #ifdef HAS_TRACEWRAP
-    TCGv t = tcg_const_i32(opc);
+    TCGv_i32 t = tcg_const_i32(opc);
     gen_helper_trace_ld64(cpu_env, val, a32, t);
-    tcg_temp_free(t);
+    tcg_temp_free_i32(t);
 #endif
 }
 
@@ -1108,9 +1108,9 @@ void gen_aa32_st_i64(DisasContext *s, TCGv_i64 val, TCGv_i32 a32,
 {
     gen_aa32_st_internal_i64(s, val, a32, index, finalize_memop(s, opc));
 #ifdef HAS_TRACEWRAP
-    TCGv t = tcg_const_i32(opc);
+    TCGv_i32 t = tcg_const_i32(opc);
     gen_helper_trace_st64(cpu_env, val, a32, t);
-    tcg_temp_free(t);
+    tcg_temp_free_i32(t);
 #endif
 }
 
@@ -2670,21 +2670,13 @@ static void gen_goto_ptr(void)
 #ifdef HAS_TRACEWRAP
 static inline void gen_trace_newframe(DisasContext *s)
 {
-    TCGv t = tcg_const_i32(s->pc_curr);
+    TCGv_i32 t = tcg_const_i32(s->pc_curr);
     gen_helper_trace_newframe(t);
-    tcg_temp_free(t);
+    tcg_temp_free_i32(t);
     TCGv_ptr mt = tcg_const_ptr(s->thumb ? FRAME_MODE_ARM_T32 : FRAME_MODE_ARM_A32);
     gen_helper_trace_mode(mt);
     tcg_temp_free_ptr(mt);
-    trace_instr_state_reset();
-}
-
-static inline void gen_trace_store_cpsr(void)
-{
-    if (!store_cpsr) {
-        return;
-    }
-    gen_helper_log_store_cpsr(cpu_env);
+    trace_cpsr_reset();
 }
 
 static inline void gen_trace_endframe(DisasContext *s)
@@ -5072,7 +5064,7 @@ static void disas_xscale_insn(DisasContext *s, uint32_t insn)
         }
     }
 #ifdef HAS_TRACEWRAP
-    trace_store_cpsr();
+    trace_store_cpsr_all();
 #endif //HAS_TRACEWRAP
 }
 
@@ -5110,8 +5102,8 @@ static void gen_addq(DisasContext *s, TCGv_i64 val, int rlow, int rhigh)
 static void gen_logicq_cc(TCGv_i32 lo, TCGv_i32 hi)
 {
 #ifdef HAS_TRACEWRAP
-    trace_read_cpsr();
-    trace_store_cpsr();
+    trace_read_cpsr_all();
+    trace_store_cpsr_all();
 #endif //HAS_TRACEWRAP
     tcg_gen_mov_i32(cpu_NF, hi);
     tcg_gen_or_i32(cpu_ZF, lo, hi);
@@ -5221,13 +5213,13 @@ static void gen_store_exclusive(DisasContext *s, int rd, int rt, int rt2,
         tcg_gen_atomic_cmpxchg_i64(o64, taddr, cpu_exclusive_val, n64,
                                    get_mem_index(s), opc);
 #ifdef HAS_TRACEWRAP
-        TCGv mot = tcg_const_i32(opc);
-        gen_helper_trace_st(cpu_env, t1, taddr, mot);
-        TCGv taddr2 = tcg_temp_new_i32();
-        tcg_gen_addi_i32(taddr2, taddr, 4);
-        gen_helper_trace_st(cpu_env, t2, taddr2, mot);
-        tcg_temp_free(taddr2);
-        tcg_temp_free(mot);
+        TCGv_i32 mot = tcg_const_i32(opc);
+        gen_helper_trace_st(cpu_env, t1, addr, mot);
+        TCGv_i32 addr2 = tcg_temp_new_i32();
+        tcg_gen_addi_i32(addr2, addr, 4);
+        gen_helper_trace_st(cpu_env, t2, addr2, mot);
+        tcg_temp_free_i32(addr2);
+        tcg_temp_free_i32(mot);
 #endif //HAS_TRACEWRAP
         tcg_temp_free_i64(n64);
 
@@ -5240,9 +5232,9 @@ static void gen_store_exclusive(DisasContext *s, int rd, int rt, int rt2,
         tcg_gen_extrl_i64_i32(t2, cpu_exclusive_val);
         tcg_gen_atomic_cmpxchg_i32(t0, taddr, t2, t1, get_mem_index(s), opc);
 #ifdef HAS_TRACEWRAP
-        TCGv mot = tcg_const_i32(opc);
-        gen_helper_trace_st(cpu_env, t1, taddr, mot);
-        tcg_temp_free(mot);
+        TCGv_i32 mot = tcg_const_i32(opc);
+        gen_helper_trace_st(cpu_env, t1, addr, mot);
+        tcg_temp_free_i32(mot);
 #endif //HAS_TRACEWRAP
         tcg_gen_setcond_i32(TCG_COND_NE, t0, t0, t2);
         tcg_temp_free_i32(t2);
@@ -6273,8 +6265,8 @@ static bool op_qaddsub(DisasContext *s, arg_rrr *a, bool add, bool doub)
         gen_helper_sub_saturate(t0, cpu_env, t0, t1);
     }
 #ifdef HAS_TRACEWRAP
-    trace_read_cpsr();
-    trace_store_cpsr();
+    trace_read_cpsr_all();
+    trace_store_cpsr_all();
 #endif
     tcg_temp_free_i32(t1);
     store_reg(s, a->rd, t0);
@@ -6321,8 +6313,8 @@ static bool op_smlaxxx(DisasContext *s, arg_rrrr *a,
     case 1:
         t1 = load_reg(s, a->ra);
 #ifdef HAS_TRACEWRAP
-        trace_read_cpsr();
-        trace_store_cpsr();
+        trace_read_cpsr_all();
+        trace_store_cpsr_all();
 #endif
         gen_helper_add_setq(t0, cpu_env, t0, t1);
         tcg_temp_free_i32(t1);
@@ -6393,8 +6385,8 @@ static bool op_smlawx(DisasContext *s, arg_rrrr *a, bool add, bool mt)
     if (add) {
         t0 = load_reg(s, a->ra);
 #ifdef HAS_TRACEWRAP
-        trace_read_cpsr();
-        trace_store_cpsr();
+        trace_read_cpsr_all();
+        trace_store_cpsr_all();
 #endif
         gen_helper_add_setq(t1, cpu_env, t1, t0);
         tcg_temp_free_i32(t0);
@@ -6565,7 +6557,7 @@ static bool trans_MRS_reg(DisasContext *s, arg_MRS_reg *a)
         tmp = tcg_temp_new_i32();
         gen_helper_cpsr_read(tmp, cpu_env);
 #ifdef HAS_TRACEWRAP
-        trace_read_cpsr();
+        trace_read_cpsr_all();
 #endif
     }
     store_reg(s, a->rd, tmp);
@@ -6585,8 +6577,8 @@ static bool trans_MSR_reg(DisasContext *s, arg_MSR_reg *a)
         unallocated_encoding(s);
     }
 #ifdef HAS_TRACEWRAP
-    trace_read_cpsr();
-    trace_store_cpsr();
+    trace_read_cpsr_all();
+    trace_store_cpsr_all();
 #endif
     return true;
 }
@@ -6663,9 +6655,9 @@ static bool trans_BLX_r(DisasContext *s, arg_BLX_r *a)
     tmp = load_reg(s, a->rm);
     target_ulong lr = s->base.pc_next | s->thumb;
 #ifdef HAS_TRACEWRAP
-    TCGv t = tcg_constant_i32(lr);
+    TCGv_i32 t = tcg_constant_i32(lr);
     gen_trace_store_reg(14, t);
-    tcg_temp_free(t);
+    tcg_temp_free_i32(t);
 #endif
     tcg_gen_movi_i32(cpu_R[14], lr);
     gen_bx(s, tmp);
@@ -7815,8 +7807,8 @@ static bool op_sat(DisasContext *s, arg_sat *a,
     }
 
 #ifdef HAS_TRACEWRAP
-    trace_read_cpsr();
-    trace_store_cpsr();
+    trace_read_cpsr_all();
+    trace_store_cpsr_all();
 #endif
     satimm = tcg_const_i32(a->satimm);
     gen(tmp, cpu_env, tmp, satimm);
@@ -7926,7 +7918,7 @@ static bool trans_SEL(DisasContext *s, arg_rrr *a)
     }
 
 #ifdef HAS_TRACEWRAP
-    trace_read_cpsr();
+    trace_read_cpsr_all();
 #endif
 
     t1 = load_reg(s, a->rn);
@@ -8014,8 +8006,8 @@ static bool op_smlad(DisasContext *s, arg_rrrr *a, bool m_swap, bool sub)
         if (a->ra != 15) {
             t2 = load_reg(s, a->ra);
 #ifdef HAS_TRACEWRAP
-            trace_read_cpsr();
-            trace_store_cpsr();
+            trace_read_cpsr_all();
+            trace_store_cpsr_all();
 #endif
             gen_helper_add_setq(t1, cpu_env, t1, t2);
             tcg_temp_free_i32(t2);
@@ -8023,8 +8015,8 @@ static bool op_smlad(DisasContext *s, arg_rrrr *a, bool m_swap, bool sub)
     } else if (a->ra == 15) {
         /* Single saturation-checking addition */
 #ifdef HAS_TRACEWRAP
-        trace_read_cpsr();
-        trace_store_cpsr();
+        trace_read_cpsr_all();
+        trace_store_cpsr_all();
 #endif
         gen_helper_add_setq(t1, cpu_env, t1, t2);
         tcg_temp_free_i32(t2);
@@ -8059,8 +8051,8 @@ static bool op_smlad(DisasContext *s, arg_rrrr *a, bool m_swap, bool sub)
         t3 = tcg_temp_new_i32();
         tcg_gen_sari_i32(t3, t1, 31);
 #ifdef HAS_TRACEWRAP
-        trace_read_cpsr();
-        trace_store_cpsr();
+        trace_read_cpsr_all();
+        trace_store_cpsr_all();
 #endif
         qf = load_cpu_field(QF);
         one = tcg_constant_i32(1);
@@ -8572,9 +8564,9 @@ static bool trans_BL(DisasContext *s, arg_i *a)
     int32_t lr = s->base.pc_next | s->thumb;
     tcg_gen_movi_i32(cpu_R[14], lr);
 #ifdef HAS_TRACEWRAP
-    TCGv t = tcg_constant_i32(lr);
+    TCGv_i32 t = tcg_constant_i32(lr);
     gen_trace_store_reg(14, t);
-    tcg_temp_free(t);
+    tcg_temp_free_i32(t);
 #endif //HAS_TRACEWRAP
     gen_jmp(s, read_pc(s) + a->imm);
     return true;
@@ -8596,9 +8588,9 @@ static bool trans_BLX_i(DisasContext *s, arg_BLX_i *a)
     }
     int32_t lr = s->base.pc_next | s->thumb;
 #ifdef HAS_TRACEWRAP
-    TCGv t = tcg_constant_i32(lr);
+    TCGv_i32 t = tcg_constant_i32(lr);
     gen_trace_store_reg(14, t);
-    tcg_temp_free(t);
+    tcg_temp_free_i32(t);
 #endif
     tcg_gen_movi_i32(cpu_R[14], lr);
     store_cpu_field_constant(!s->thumb, thumb);
@@ -9800,7 +9792,7 @@ static void arm_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 #endif //HAS_TRACEWRAP
     disas_arm_insn(dc, insn);
 #ifdef HAS_TRACEWRAP
-    gen_trace_store_cpsr();
+    gen_trace_flush_cpsr();
 #endif //HAS_TRACEWRAP
 
     arm_post_translate_insn(dc);
@@ -9957,7 +9949,7 @@ static void thumb_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
     }
 
 #ifdef HAS_TRACEWRAP
-    gen_trace_store_cpsr();
+    gen_trace_flush_cpsr();
 #endif //HAS_TRACEWRAP
 
     if (dc->eci && !dc->eci_handled) {

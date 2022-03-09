@@ -58,6 +58,13 @@ DEF_HELPER_3(cpsr_write, void, env, i32, i32)
 DEF_HELPER_2(cpsr_write_eret, void, env, i32)
 DEF_HELPER_1(cpsr_read, i32, env)
 
+#define TRACE_CPSR_NF (1 << 0)
+#define TRACE_CPSR_ZF (1 << 1)
+#define TRACE_CPSR_CF (1 << 2)
+#define TRACE_CPSR_VF (1 << 3)
+#define TRACE_CPSR_QF (1 << 4)
+#define TRACE_CPSR_GE (1 << 5)
+#define TRACE_CPSR_ALL 0xffffffff
 #ifdef HAS_TRACEWRAP
 DEF_HELPER_1(trace_newframe, void, i32)
 DEF_HELPER_3(trace_endframe, void, env, i32, i32)
@@ -69,11 +76,15 @@ DEF_HELPER_2(trace_load_reg, void, i32, i32)
 DEF_HELPER_2(trace_store_reg, void, i32, i32)
 DEF_HELPER_2(trace_load_reg64, void, i32, i64)
 DEF_HELPER_2(trace_store_reg64, void, i32, i64)
-DEF_HELPER_3(trace_cpsr_write, void, env, i32, i32)
-DEF_HELPER_1(trace_cpsr_read, i32, env)
-DEF_HELPER_1(log_read_cpsr, void, env)
-DEF_HELPER_1(log_store_cpsr, void, env)
 DEF_HELPER_1(trace_mode, void, ptr)
+DEF_HELPER_2(trace_read_cpsr, void, env, i32)
+DEF_HELPER_2(trace_store_cpsr, void, env, i32)
+#ifdef TARGET_AARCH64
+DEF_HELPER_1(trace_newframe_64, void, i64)
+DEF_HELPER_2(trace_endframe_64, void, env, i64)
+DEF_HELPER_4(trace_ld64_64, void, env, i64, i64, i32)
+DEF_HELPER_4(trace_st64_64, void, env, i64, i64, i32)
+#endif
 #endif //HAS_TRACEWRAP
 
 DEF_HELPER_3(v7m_msr, void, env, i32, i32)

@@ -249,7 +249,7 @@ void qemu_trace_init(const char *filename,
 void qemu_trace_newframe(target_ulong addr, int __unused/*thread_id*/ ) {
     int thread_id = 1;
     if (open_frame) {
-        qemu_log("frame is still open");
+        qemu_log("Error: frame is still open when reaching pc 0x%llx!\n", (unsigned long long)addr);
         qemu_trace_endframe(NULL, 0, 0);
     }
 

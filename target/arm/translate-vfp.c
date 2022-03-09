@@ -40,9 +40,9 @@ static inline void vfp_load_reg64(TCGv_i64 var, int reg)
 {
     tcg_gen_ld_i64(var, cpu_env, vfp_reg_offset(true, reg));
 #ifdef HAS_TRACEWRAP
-    TCGv t = tcg_const_i32(reg);
+    TCGv_i32 t = tcg_const_i32(REG64_D0 + reg);
     gen_helper_trace_load_reg64(t, var);
-    tcg_temp_free(t);
+    tcg_temp_free_i32(t);
 #endif
 }
 
@@ -50,9 +50,9 @@ static inline void vfp_store_reg64(TCGv_i64 var, int reg)
 {
     tcg_gen_st_i64(var, cpu_env, vfp_reg_offset(true, reg));
 #ifdef HAS_TRACEWRAP
-    TCGv t = tcg_const_i32(reg);
+    TCGv_i32 t = tcg_const_i32(REG64_D0 + reg);
     gen_helper_trace_store_reg64(t, var);
-    tcg_temp_free(t);
+    tcg_temp_free_i32(t);
 #endif
 }
 
@@ -60,9 +60,9 @@ static inline void vfp_load_reg32(TCGv_i32 var, int reg)
 {
     tcg_gen_ld_i32(var, cpu_env, vfp_reg_offset(false, reg));
 #ifdef HAS_TRACEWRAP
-    TCGv t = tcg_const_i32(REG_S0 + reg);
+    TCGv_i32 t = tcg_const_i32(REG_S0 + reg);
     gen_helper_trace_load_reg(t, var);
-    tcg_temp_free(t);
+    tcg_temp_free_i32(t);
 #endif
 }
 
@@ -70,9 +70,9 @@ static inline void vfp_store_reg32(TCGv_i32 var, int reg)
 {
     tcg_gen_st_i32(var, cpu_env, vfp_reg_offset(false, reg));
 #ifdef HAS_TRACEWRAP
-    TCGv t = tcg_const_i32(REG_S0 + reg);
+    TCGv_i32 t = tcg_const_i32(REG_S0 + reg);
     gen_helper_trace_store_reg(t, var);
-    tcg_temp_free(t);
+    tcg_temp_free_i32(t);
 #endif
 }
 

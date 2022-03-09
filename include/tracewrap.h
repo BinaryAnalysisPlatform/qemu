@@ -42,9 +42,9 @@ void qemu_trace_set_mode(const char *mode_str);
 void qemu_trace_endframe(CPUArchState *env, target_ulong pc, target_ulong size);
 void qemu_trace_finish(uint32_t exit_code);
 
-OperandInfo * load_store_reg(target_ulong reg, target_ulong val, int ls);
-OperandInfo * load_store_reg64(target_ulong reg, uint64_t val, int ls);
-OperandInfo * load_store_mem(uint32_t addr, int ls, const void *data, size_t data_size);
+OperandInfo * load_store_reg(uint32_t reg, uint32_t val, int ls);
+OperandInfo * load_store_reg64(uint32_t reg, uint64_t val, int ls);
+OperandInfo * load_store_mem(uint64_t addr, int ls, const void *data, size_t data_size);
 
 #define REG_EFLAGS 66
 #define REG_LO 33
@@ -64,5 +64,7 @@ OperandInfo * load_store_mem(uint32_t addr, int ls, const void *data, size_t dat
 #define REG_GE 99
 
 #define REG_S0 100 // s1 is REG_S0 + 1 and so on
+
+#define REG64_D0 100 // d1 is REG_D0 + 1 and so on
 
 #define SEG_BIT 8
