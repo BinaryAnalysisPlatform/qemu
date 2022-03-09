@@ -5097,11 +5097,12 @@ static void gen_addq(DisasContext *s, TCGv_i64 val, int rlow, int rhigh)
 /* Set N and Z flags from hi|lo.  */
 static void gen_logicq_cc(TCGv_i32 lo, TCGv_i32 hi)
 {
-    tcg_gen_mov_i32(cpu_NF, hi);
-    tcg_gen_or_i32(cpu_ZF, lo, hi);
 #ifdef HAS_TRACEWRAP
+    trace_read_cpsr();
     trace_store_cpsr();
 #endif //HAS_TRACEWRAP
+    tcg_gen_mov_i32(cpu_NF, hi);
+    tcg_gen_or_i32(cpu_ZF, lo, hi);
 }
 
 /* Load/Store exclusive instructions are implemented by remembering
@@ -6307,6 +6308,10 @@ static bool op_smlaxxx(DisasContext *s, arg_rrrr *a,
         break;
     case 1:
         t1 = load_reg(s, a->ra);
+#ifdef HAS_TRACEWRAP
+        trace_read_cpsr();
+        trace_store_cpsr();
+#endif
         gen_helper_add_setq(t0, cpu_env, t0, t1);
         tcg_temp_free_i32(t1);
         store_reg(s, a->rd, t0);
@@ -6375,6 +6380,10 @@ static bool op_smlawx(DisasContext *s, arg_rrrr *a, bool add, bool mt)
     tcg_temp_free_i32(t0);
     if (add) {
         t0 = load_reg(s, a->ra);
+#ifdef HAS_TRACEWRAP
+        trace_read_cpsr();
+        trace_store_cpsr();
+#endif
         gen_helper_add_setq(t1, cpu_env, t1, t0);
         tcg_temp_free_i32(t0);
     }
@@ -7793,6 +7802,10 @@ static bool op_sat(DisasContext *s, arg_sat *a,
         tcg_gen_shli_i32(tmp, tmp, shift);
     }
 
+#ifdef HAS_TRACEWRAP
+    trace_read_cpsr();
+    trace_store_cpsr();
+#endif
     satimm = tcg_const_i32(a->satimm);
     gen(tmp, cpu_env, tmp, satimm);
     tcg_temp_free_i32(satimm);
@@ -7988,11 +8001,19 @@ static bool op_smlad(DisasContext *s, arg_rrrr *a, bool m_swap, bool sub)
 
         if (a->ra != 15) {
             t2 = load_reg(s, a->ra);
+#ifdef HAS_TRACEWRAP
+            trace_read_cpsr();
+            trace_store_cpsr();
+#endif
             gen_helper_add_setq(t1, cpu_env, t1, t2);
             tcg_temp_free_i32(t2);
         }
     } else if (a->ra == 15) {
         /* Single saturation-checking addition */
+#ifdef HAS_TRACEWRAP
+        trace_read_cpsr();
+        trace_store_cpsr();
+#endif
         gen_helper_add_setq(t1, cpu_env, t1, t2);
         tcg_temp_free_i32(t2);
     } else {
@@ -8025,6 +8046,10 @@ static bool op_smlad(DisasContext *s, arg_rrrr *a, bool m_swap, bool sub)
          */
         t3 = tcg_temp_new_i32();
         tcg_gen_sari_i32(t3, t1, 31);
+#ifdef HAS_TRACEWRAP
+        trace_read_cpsr();
+        trace_store_cpsr();
+#endif
         qf = load_cpu_field(QF);
         one = tcg_constant_i32(1);
         tcg_gen_movcond_i32(TCG_COND_NE, qf, t2, t3, one, qf);
