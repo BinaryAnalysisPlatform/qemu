@@ -1,9 +1,11 @@
-#include <stdint.h>
+
+#include "qemu/osdep.h"
 
 #include "cpu.h"
-#include "helper.h"
 #include "tracewrap.h"
 #include "qemu/log.h"
+#include "exec/helper-proto.h"
+#include "tcg/tcg.h"
 
 
 static const char* const regs[CPU_NB_REGS] = {
@@ -57,7 +59,11 @@ void HELPER(trace_endframe)(CPUArchState *env, target_ulong old_pc, target_ulong
     qemu_trace_endframe(env, old_pc, size);
 }
 
-OperandInfo * load_store_reg(target_ulong reg, target_ulong val, int ls) {
+#ifdef TARGET_X86_64
+OperandInfo *load_store_reg64(uint32_t reg, uint64_t val, int ls) {
+#else
+OperandInfo *load_store_reg(uint32_t reg, uint32_t val, int ls) {
+#endif
     RegOperand *ro = g_new(RegOperand,1);
     reg_operand__init(ro);
     int isSeg = reg & (1 << SEG_BIT);
@@ -98,20 +104,28 @@ OperandInfo * load_store_reg(target_ulong reg, target_ulong val, int ls) {
     return oi;
 }
 
-void HELPER(trace_load_reg)(target_ulong reg, target_ulong val)
+void HELPER(trace_load_reg)(uint32_t reg, target_ulong val)
 {
-    qemu_log("This register (r" TARGET_FMT_ld ") was read. Value 0x" TARGET_FMT_lx "\n", reg, val);
+    qemu_log("This register (r%u) was read. Value 0x" TARGET_FMT_lx "\n", reg, val);
 
+#ifdef TARGET_X86_64
+    OperandInfo *oi = load_store_reg64(reg, val, 0);
+#else
     OperandInfo *oi = load_store_reg(reg, val, 0);
+#endif
 
     qemu_trace_add_operand(oi, 0x1);
 }
 
-void HELPER(trace_store_reg)(target_ulong reg, target_ulong val)
+void HELPER(trace_store_reg)(uint32_t reg, target_ulong val)
 {
-    qemu_log("This register (r" TARGET_FMT_ld ") was written. Value: 0x" TARGET_FMT_lx "\n", reg, val);
+    qemu_log("This register (r%u) was written. Value: 0x" TARGET_FMT_lx "\n", reg, val);
 
+#ifdef TARGET_X86_64
+    OperandInfo *oi = load_store_reg64(reg, val, 1);
+#else
     OperandInfo *oi = load_store_reg(reg, val, 1);
+#endif
 
     qemu_trace_add_operand(oi, 0x2);
 }
@@ -120,7 +134,11 @@ void HELPER(trace_load_eflags)(CPUArchState *env)
 {
     uint32_t val = cpu_compute_eflags(env);
 
+#ifdef TARGET_X86_64
+    OperandInfo *oi = load_store_reg64(REG_EFLAGS, val, 0);
+#else
     OperandInfo *oi = load_store_reg(REG_EFLAGS, val, 0);
+#endif
 
     //OperandInfo *oi = load_store_reg(REG_EFLAGS, cpu_compute_eflags(env), 0);
 
@@ -131,15 +149,18 @@ void HELPER(trace_store_eflags)(CPUArchState *env)
 {
     uint32_t val = cpu_compute_eflags(env);
 
+#ifdef TARGET_X86_64
+    OperandInfo *oi = load_store_reg64(REG_EFLAGS, val, 1);
+#else
     OperandInfo *oi = load_store_reg(REG_EFLAGS, val, 1);
+#endif
 
     //OperandInfo *oi = load_store_reg(REG_EFLAGS, cpu_compute_eflags(env), 1);
 
     qemu_trace_add_operand(oi, 0x2);
 }
 
-// TODO: signature has changed, see arm
-OperandInfo * load_store_mem(target_ulong addr, target_ulong val, int ls, int len)
+OperandInfo *load_store_mem(uint64_t addr, int ls, const void *data, size_t data_size)
 {
     MemOperand * mo = g_new(MemOperand, 1);
     mem_operand__init(mo);
@@ -159,12 +180,12 @@ OperandInfo * load_store_mem(target_ulong addr, target_ulong val, int ls, int le
     }
     OperandInfo *oi = g_new(OperandInfo, 1);
     operand_info__init(oi);
-    oi->bit_length = len*8;
+    oi->bit_length = data_size * 8;
     oi->operand_info_specific = ois;
     oi->operand_usage = ou;
-    oi->value.len = len;
+    oi->value.len = data_size;
     oi->value.data = g_malloc(oi->value.len);
-    memcpy(oi->value.data, &val, len);
+    memcpy(oi->value.data, &data, data_size);
     return oi;
 }
 
@@ -181,7 +202,7 @@ void HELPER(trace_st)(CPUArchState *env, target_ulong val, target_ulong addr)
 {
     qemu_log("This was a store 0x" TARGET_FMT_lx " addr:0x" TARGET_FMT_lx " value:0x" TARGET_FMT_lx "\n", env->eip, addr, val);
 
-    OperandInfo *oi = load_store_mem(addr, val, 1, sizeof(val));
+    OperandInfo *oi = load_store_mem(addr, 1, &val, sizeof(val));
 
     qemu_trace_add_operand(oi, 0x2);
 }
