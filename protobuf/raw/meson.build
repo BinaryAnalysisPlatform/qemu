@@ -5,7 +5,7 @@ protoc_c = find_program('protoc-c')
 tracewrap_dir = get_option('tracewrap_dir')
 
 piqi_src = custom_target('piqi',
-  input: tracewrap_dir / 'piqi/frame.piqi',
+  input: join_paths(meson.project_source_root(), tracewrap_dir) / 'piqi/frame.piqi',
   output: 'frame.piqi.proto',
   command: [piqi, 'to-proto', '@INPUT@', '-o', '@OUTPUT@'])
 

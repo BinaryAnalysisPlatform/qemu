@@ -14,5 +14,5 @@ protobuf_c = dependency('libprotobuf-c')
 
 protoframes = declare_dependency(
   link_with: libprotoframes,
-  include_directories: ['.', tracewrap_dir / 'libtrace' / 'src'],
+  include_directories: ['.', '../' / tracewrap_dir / 'libtrace' / 'src'],
   dependencies: protobuf_c)
