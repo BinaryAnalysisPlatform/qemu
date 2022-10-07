@@ -84,6 +84,7 @@ typedef struct DisasContext {
 
     int8_t override; /* -1 if no override, else R_CS, R_DS, etc */
     uint8_t prefix;
+    uint8_t insn_sz;
 
 #ifndef CONFIG_USER_ONLY
     uint8_t cpl;   /* code priv level */
@@ -303,6 +304,41 @@ static const uint8_t cc_op_live[CC_OP_NB] = {
     [CC_OP_CLR] = 0,
     [CC_OP_POPCNT] = USES_CC_SRC,
 };
+
+
+#ifdef HAS_TRACEWRAP
+#include <frame_arch.h>
+
+static inline void gen_trace_newframe(DisasContext *ctx) {
+    TCGv_i64 pc_tcg = tcg_temp_new_i64();
+    tcg_gen_movi_i64(pc_tcg, ctx->pc);
+#ifdef TARGET_X86_64
+    TCGv_ptr mode = tcg_const_ptr(FRAME_MODE_X86_64);
+#else
+    TCGv_ptr mode = tcg_const_ptr(FRAME_MODE_X86);
+#endif
+
+    gen_helper_trace_newframe(pc_tcg);
+    gen_helper_trace_mode(mode);
+    tcg_temp_free_ptr(mode);
+    tcg_temp_free_i64(pc_tcg);
+}
+
+static inline void gen_trace_endframe(DisasContext *ctx)
+{
+    TCGv_i64 pc_tcg = tcg_temp_new_i64();
+    tcg_gen_movi_i64(pc_tcg, ctx->pc);
+    TCGv_i64 sz_tcg = tcg_temp_new_i64();
+    tcg_gen_movi_i64(sz_tcg, ctx->insn_sz);
+
+    gen_helper_trace_endframe(cpu_env, pc_tcg, sz_tcg);
+
+    tcg_temp_free_i64(sz_tcg);
+    tcg_temp_free_i64(pc_tcg);
+}
+
+#endif /* HAS_TRACEWRAP */
+
 
 static void set_cc_op(DisasContext *s, CCOp op)
 {
@@ -4578,6 +4614,7 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
         gen_exception_gpf(s);
         return s->pc;
     }
+    s->insn_sz = 0;
 
     prefixes = 0;
 
@@ -8459,8 +8496,10 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
     default:
         goto unknown_op;
     }
+    s->insn_sz = s->pc - s->pc_start;
     return s->pc;
  illegal_op:
+    s->insn_sz = s->pc - s->pc_start;
     gen_illegal_opcode(s);
     return s->pc;
  unknown_op:
@@ -8643,6 +8682,10 @@ static void i386_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 #endif
 
     pc_next = disas_insn(dc, cpu);
+
+#ifdef HAS_TRACEWRAP
+    gen_trace_newframe(dc);
+#endif //HAS_TRACEWRAP
 
     if (dc->flags & (HF_TF_MASK | HF_INHIBIT_IRQ_MASK)) {
         /* if single step mode, we generate only one instruction and

@@ -59,6 +59,10 @@ void HELPER(trace_endframe)(CPUArchState *env, target_ulong old_pc, target_ulong
     qemu_trace_endframe(env, old_pc, size);
 }
 
+void HELPER(trace_mode)(void *mode) {
+    qemu_trace_set_mode(mode);
+}
+
 #ifdef TARGET_X86_64
 OperandInfo *load_store_reg64(uint32_t reg, uint64_t val, int ls) {
 #else
