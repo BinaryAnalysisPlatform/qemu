@@ -193,20 +193,20 @@ OperandInfo *load_store_mem(uint64_t addr, int ls, const void *data, size_t data
     return oi;
 }
 
-void HELPER(trace_ld)(CPUArchState *env, target_ulong val, target_ulong addr)
+void HELPER(trace_ld)(target_ulong val, target_ulong addr, MemOp op)
 {
-    qemu_log("This was a read 0x" TARGET_FMT_lx " addr:0x" TARGET_FMT_lx " value:0x" TARGET_FMT_lx "\n", env->eip, addr, val);
+    qemu_log("This was a read addr:0x" TARGET_FMT_lx " value:0x" TARGET_FMT_lx " size:0x%x\n", addr, val, memop_size(op));
 
-    OperandInfo *oi = load_store_mem(addr, val, 0, sizeof(val));
+    OperandInfo *oi = load_store_mem(addr, 0, &val, memop_size(op));
 
     qemu_trace_add_operand(oi, 0x1);
 }
 
-void HELPER(trace_st)(CPUArchState *env, target_ulong val, target_ulong addr)
+void HELPER(trace_st)(target_ulong val, target_ulong addr, MemOp op)
 {
-    qemu_log("This was a store 0x" TARGET_FMT_lx " addr:0x" TARGET_FMT_lx " value:0x" TARGET_FMT_lx "\n", env->eip, addr, val);
+    qemu_log("This was a store addr:0x" TARGET_FMT_lx " value:0x" TARGET_FMT_lx "\n", addr, val);
 
-    OperandInfo *oi = load_store_mem(addr, 1, &val, sizeof(val));
+    OperandInfo *oi = load_store_mem(addr, 1, &val, memop_size(op));
 
     qemu_trace_add_operand(oi, 0x2);
 }
