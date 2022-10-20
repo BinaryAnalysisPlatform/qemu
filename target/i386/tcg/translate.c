@@ -310,31 +310,46 @@ static const uint8_t cc_op_live[CC_OP_NB] = {
 #include <frame_arch.h>
 
 static void gen_trace_newframe(DisasContext *ctx) {
+#ifdef TARGET_X86_64
     TCGv_i64 pc_tcg = tcg_temp_new_i64();
     tcg_gen_movi_i64(pc_tcg, ctx->pc);
-#ifdef TARGET_X86_64
-    TCGv_ptr mode = tcg_const_ptr(FRAME_MODE_X86_64);
 #else
-    TCGv_ptr mode = tcg_const_ptr(FRAME_MODE_X86);
+    TCGv_i32 pc_tcg = tcg_temp_new_i32();
+    tcg_gen_movi_i32(pc_tcg, ctx->pc);
 #endif
 
     gen_helper_trace_newframe(pc_tcg);
-    gen_helper_trace_mode(mode);
-    tcg_temp_free_ptr(mode);
+
+#ifdef TARGET_X86_64
     tcg_temp_free_i64(pc_tcg);
+#else
+    tcg_temp_free_i32(pc_tcg);
+#endif
 }
 
 static void gen_trace_endframe(DisasContext *ctx)
 {
+#ifdef TARGET_X86_64
     TCGv_i64 pc_tcg = tcg_temp_new_i64();
     tcg_gen_movi_i64(pc_tcg, ctx->pc);
     TCGv_i64 sz_tcg = tcg_temp_new_i64();
     tcg_gen_movi_i64(sz_tcg, ctx->insn_sz);
+#else
+    TCGv_i32 pc_tcg = tcg_temp_new_i32();
+    tcg_gen_movi_i32(pc_tcg, ctx->pc);
+    TCGv_i32 sz_tcg = tcg_temp_new_i32();
+    tcg_gen_movi_i32(sz_tcg, ctx->insn_sz);
+#endif
 
     gen_helper_trace_endframe(cpu_env, pc_tcg, sz_tcg);
 
+#ifdef TARGET_X86_64
     tcg_temp_free_i64(sz_tcg);
     tcg_temp_free_i64(pc_tcg);
+#else
+    tcg_temp_free_i32(sz_tcg);
+    tcg_temp_free_i32(pc_tcg);
+#endif
 }
 
 static void gen_trace_load_reg(int reg, TCGv var) {
