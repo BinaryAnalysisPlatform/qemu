@@ -53,9 +53,8 @@ void HELPER(trace_newframe)(target_ulong pc)
     qemu_trace_newframe(pc, 0);
 }
 
-void HELPER(trace_endframe)(CPUArchState *env, target_ulong old_pc, target_ulong size)
+void HELPER(trace_endframe)(CPUArchState *env, target_ulong old_pc, uint32_t size)
 {
-    //qemu_trace_endframe(env, env->eip - size, size);
     qemu_trace_endframe(env, old_pc, size);
 }
 

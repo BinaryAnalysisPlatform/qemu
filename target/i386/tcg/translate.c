@@ -84,7 +84,6 @@ typedef struct DisasContext {
 
     int8_t override; /* -1 if no override, else R_CS, R_DS, etc */
     uint8_t prefix;
-    uint8_t insn_sz;
 
 #ifndef CONFIG_USER_ONLY
     uint8_t cpl;   /* code priv level */
@@ -312,10 +311,10 @@ static const uint8_t cc_op_live[CC_OP_NB] = {
 static void gen_trace_newframe(DisasContext *ctx) {
 #ifdef TARGET_X86_64
     TCGv_i64 pc_tcg = tcg_temp_new_i64();
-    tcg_gen_movi_i64(pc_tcg, ctx->pc);
+    tcg_gen_movi_i64(pc_tcg, ctx->base.pc_next);
 #else
     TCGv_i32 pc_tcg = tcg_temp_new_i32();
-    tcg_gen_movi_i32(pc_tcg, ctx->pc);
+    tcg_gen_movi_i32(pc_tcg, ctx->base.pc_next);
 #endif
 
     gen_helper_trace_newframe(pc_tcg);
@@ -331,23 +330,22 @@ static void gen_trace_endframe(DisasContext *ctx)
 {
 #ifdef TARGET_X86_64
     TCGv_i64 pc_tcg = tcg_temp_new_i64();
-    tcg_gen_movi_i64(pc_tcg, ctx->pc);
-    TCGv_i64 sz_tcg = tcg_temp_new_i64();
-    tcg_gen_movi_i64(sz_tcg, ctx->insn_sz);
+    tcg_gen_movi_i64(pc_tcg, ctx->pc_start);
 #else
     TCGv_i32 pc_tcg = tcg_temp_new_i32();
-    tcg_gen_movi_i32(pc_tcg, ctx->pc);
-    TCGv_i32 sz_tcg = tcg_temp_new_i32();
-    tcg_gen_movi_i32(sz_tcg, ctx->insn_sz);
+    tcg_gen_movi_i32(pc_tcg, ctx->pc_start);
 #endif
+
+    TCGv_i32 sz_tcg = tcg_temp_new_i32();
+    tcg_gen_movi_i32(sz_tcg, ctx->pc - ctx->base.pc_next);
 
     gen_helper_trace_endframe(cpu_env, pc_tcg, sz_tcg);
 
+    tcg_temp_free_i32(sz_tcg);
+
 #ifdef TARGET_X86_64
-    tcg_temp_free_i64(sz_tcg);
     tcg_temp_free_i64(pc_tcg);
 #else
-    tcg_temp_free_i32(sz_tcg);
     tcg_temp_free_i32(pc_tcg);
 #endif
 }
@@ -621,9 +619,6 @@ static inline void gen_op_st_rm_T0_A0(DisasContext *s, int idx, int d)
 
 static inline void gen_jmp_im(DisasContext *s, target_ulong pc)
 {
-#ifdef HAS_TRACEWRAP
-    gen_trace_endframe(s);
-#endif
     tcg_gen_movi_tl(s->tmp0, pc);
     gen_op_jmp_v(s->tmp0);
 }
@@ -4750,7 +4745,6 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
         gen_exception_gpf(s);
         return s->pc;
     }
-    s->insn_sz = 0;
 
     prefixes = 0;
 
@@ -8698,10 +8692,8 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
     default:
         goto unknown_op;
     }
-    s->insn_sz = s->pc - s->pc_start;
     return s->pc;
  illegal_op:
-    s->insn_sz = s->pc - s->pc_start;
     gen_illegal_opcode(s);
     return s->pc;
  unknown_op:
@@ -8924,6 +8916,9 @@ static void i386_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
     DisasContext *dc = container_of(dcbase, DisasContext, base);
 
     if (dc->base.is_jmp == DISAS_TOO_MANY) {
+#ifdef HAS_TRACEWRAP
+        gen_trace_endframe(dc);
+#endif
         gen_jmp_im(dc, dc->base.pc_next - dc->cs_base);
         gen_eob(dc);
     }
