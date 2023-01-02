@@ -183,7 +183,7 @@ OperandInfo *load_store_mem(uint64_t addr, int ls, const void *data, size_t data
     oi->operand_usage = ou;
     oi->value.len = data_size;
     oi->value.data = g_malloc(oi->value.len);
-    memcpy(oi->value.data, &data, data_size);
+    memcpy(oi->value.data, data, data_size);
     return oi;
 }
 

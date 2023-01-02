@@ -5614,7 +5614,7 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
                 set_cc_op(s, CC_OP_EFLAGS);
                 break;
             }
-#endif        
+#endif
             if (!(s->cpuid_features & CPUID_CX8)) {
                 goto illegal_op;
             }
@@ -8906,7 +8906,7 @@ static void i386_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 
 #ifdef HAS_TRACEWRAP
     gen_trace_endframe(dc);
-#endif 
+#endif
 
     dc->base.pc_next = pc_next;
 }
