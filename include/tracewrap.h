@@ -68,3 +68,4 @@ OperandInfo *load_store_mem(uint64_t addr, int ls, const void *data, size_t data
 #define REG64_D0 100 // d1 is REG_D0 + 1 and so on
 
 #define SEG_BIT 8
+#define EFLAG_BIT 16

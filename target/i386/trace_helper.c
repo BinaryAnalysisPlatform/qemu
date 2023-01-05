@@ -47,6 +47,24 @@ static const char* const segs[CPU_NB_SEGS] = {
     [R_GS] = "GS_BASE"
 };
 
+static const char *eflags[CPU_NB_EFLAGS] = {
+	[X86_EFLAGS_CF] = "CF",
+	[X86_EFLAGS_PF] = "PF",
+	[X86_EFLAGS_AF] = "AF",
+	[X86_EFLAGS_ZF] = "ZF",
+	[X86_EFLAGS_SF] = "SF",
+	[X86_EFLAGS_TF] = "TF",
+	[X86_EFLAGS_IF] = "IF",
+	[X86_EFLAGS_DF] = "DF",
+	[X86_EFLAGS_OF] = "OF",
+	[X86_EFLAGS_NT] = "NT",
+#ifdef TARGET_X86_64
+	[X86_EFLAGS_RF] = "RF",
+	[X86_EFLAGS_VM] = "VM",
+	[X86_EFLAGS_AC] = "AC"
+#endif // TARGET_X86_64
+};
+
 void HELPER(trace_newframe)(target_ulong pc)
 {
     qemu_trace_newframe(pc, 0);
@@ -66,10 +84,14 @@ OperandInfo *load_store_reg(uint32_t reg, uint32_t val, int ls) {
     reg_operand__init(ro);
     int isSeg = reg & (1 << SEG_BIT);
     reg &= ~(1 << SEG_BIT);
+    int isEflag = reg & (1 << EFLAG_BIT);
+    reg &= ~(1 << SEG_BIT);
 
     const char* reg_name = NULL;
     if (isSeg) {
         reg_name = reg < CPU_NB_SEGS ? segs[reg] : "<UNDEF>";
+    } else if (isEflag) {
+        reg_name = reg < CPU_NB_EFLAGS ? eflags[reg] : "<UNDEF>";
     } else {
         reg_name = reg < CPU_NB_REGS ? regs[reg] :
 #ifdef TARGET_X86_64
@@ -93,12 +115,12 @@ OperandInfo *load_store_reg(uint32_t reg, uint32_t val, int ls) {
     }
     OperandInfo *oi = g_new(OperandInfo,1);
     operand_info__init(oi);
-    oi->bit_length = 0;
+    oi->bit_length = isEflag ? 1 : 0;
     oi->operand_info_specific = ois;
     oi->operand_usage = ou;
-    oi->value.len = sizeof(val);
+    oi->value.len = isSeg ? 4 : (isEflag ? 1 : sizeof(val));
     oi->value.data = g_malloc(oi->value.len);
-    memcpy(oi->value.data, &val, sizeof(val));
+    memcpy(oi->value.data, &val, oi->value.len);
     return oi;
 }
 
@@ -138,8 +160,6 @@ void HELPER(trace_load_eflags)(CPUArchState *env)
     OperandInfo *oi = load_store_reg(REG_EFLAGS, val, 0);
 #endif
 
-    //OperandInfo *oi = load_store_reg(REG_EFLAGS, cpu_compute_eflags(env), 0);
-
     qemu_trace_add_operand(oi, 0x1);
 }
 
@@ -152,8 +172,6 @@ void HELPER(trace_store_eflags)(CPUArchState *env)
 #else
     OperandInfo *oi = load_store_reg(REG_EFLAGS, val, 1);
 #endif
-
-    //OperandInfo *oi = load_store_reg(REG_EFLAGS, cpu_compute_eflags(env), 1);
 
     qemu_trace_add_operand(oi, 0x2);
 }
@@ -201,6 +219,58 @@ void HELPER(trace_st)(target_ulong val, target_ulong addr, MemOp op)
     qemu_log("This was a store addr:0x" TARGET_FMT_lx " value:0x" TARGET_FMT_lx "\n", addr, val);
 
     OperandInfo *oi = load_store_mem(addr, 1, &val, memop_size(op));
+
+    qemu_trace_add_operand(oi, 0x2);
+}
+
+void HELPER(trace_load_seg_reg)(uint32_t reg, target_ulong val) {
+    qemu_log("The segment register (seg%u) was read. Value: 0x" TARGET_FMT_lx "\n", reg, val);
+
+#ifdef TARGET_X86_64
+    OperandInfo *oi = load_store_reg64(reg | (1 << SEG_BIT), val, 0);
+#else
+    OperandInfo *oi = load_store_reg(reg | (1 << SEG_BIT), val, 0);
+#endif
+
+    qemu_trace_add_operand(oi, 0x1);
+}
+
+void HELPER(trace_store_seg_reg)(uint32_t reg, target_ulong val) {
+    qemu_log("The segment register (seg%u) was written. Value: 0x" TARGET_FMT_lx "\n", reg, val);
+
+#ifdef TARGET_X86_64
+    OperandInfo *oi = load_store_reg64(reg | (1 << SEG_BIT), val, 1);
+#else
+    OperandInfo *oi = load_store_reg(reg | (1 << SEG_BIT), val, 1);
+#endif
+
+    qemu_trace_add_operand(oi, 0x2);
+}
+
+void HELPER(trace_load_eflag_bit)(uint32_t /* X86EFlags */ reg, CPUArchState *env)
+{
+    uint32_t val =  (cpu_compute_eflags(env) >> reg) & 1;
+    qemu_log("The flag bit (eflag%u) was read. Value 0x%08x\n", reg, val);
+
+#ifdef TARGET_X86_64
+    OperandInfo *oi = load_store_reg64(reg | (1 << EFLAG_BIT), val, 0);
+#else
+    OperandInfo *oi = load_store_reg(reg | (1 << EFLAG_BIT), val, 0);
+#endif
+
+    qemu_trace_add_operand(oi, 0x1);
+}
+
+void HELPER(trace_store_eflag_bit)(uint32_t /* X86EFlags */ reg, CPUArchState *env)
+{
+    uint32_t val =  (cpu_compute_eflags(env) >> reg) & 1;
+    qemu_log("The flag bit (eflag%u) was written. Value 0x%08x\n", reg, val);
+
+#ifdef TARGET_X86_64
+    OperandInfo *oi = load_store_reg64(reg | (1 << EFLAG_BIT), val, 1);
+#else
+    OperandInfo *oi = load_store_reg(reg | (1 << EFLAG_BIT), val, 1);
+#endif
 
     qemu_trace_add_operand(oi, 0x2);
 }

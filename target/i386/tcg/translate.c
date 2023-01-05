@@ -350,33 +350,90 @@ static void gen_trace_endframe(DisasContext *ctx)
 #endif
 }
 
-static void gen_trace_load_reg(int reg, TCGv var) {
-    TCGv_i32 t = tcg_const_i32(reg);
-    gen_helper_trace_load_reg(t, var);
-    tcg_temp_free_i32(t);
-}
-
-static void gen_trace_store_reg(int reg, TCGv var) {
-    TCGv_i32 t = tcg_const_i32(reg);
-    gen_helper_trace_store_reg(t, var);
-    tcg_temp_free_i32(t);
-}
-
 #endif /* HAS_TRACEWRAP */
 
+typedef enum register_type_t {
+    X86_TYPE_REG,
+    X86_TYPE_SEG_REG,
+    X86_TYPE_EFLAG,
+    X86_TYPE_EFLAG_BIT
+} RegisterType;
+
 /* Call before the value gets loaded */
-static void log_load_reg(uint32_t reg) {
+static void log_load_reg_gen(uint32_t reg, RegisterType rt, /* for eflag */ TCGv_ptr env) {
 #ifdef HAS_TRACEWRAP
-    gen_trace_load_reg(reg, cpu_regs[reg]);
+    /* No need for unnecessary TCGv creation in case of EFLAGS */
+    TCGv_i32 t = (rt == X86_TYPE_EFLAG ? NULL : tcg_const_i32(reg));
+
+    switch (rt) {
+    case X86_TYPE_REG:
+        gen_helper_trace_load_reg(t, cpu_regs[reg]);
+        break;
+    case X86_TYPE_SEG_REG:
+        gen_helper_trace_load_seg_reg(t, cpu_seg_base[reg]);
+        break;
+    case X86_TYPE_EFLAG:
+        gen_helper_trace_load_eflags(env);
+        break;
+    case X86_TYPE_EFLAG_BIT:
+        gen_helper_trace_load_eflag_bit(t, env);
+        break;
+    default:
+        /* unreachable */
+        break;
+    }
+
+    if (rt != X86_TYPE_EFLAG) {
+        tcg_temp_free_i32(t);
+    }
 #endif
 }
 
+#define log_load_reg(reg) log_load_reg_gen(reg, X86_TYPE_REG, NULL)
+
+#define log_load_seg_reg(reg) log_load_reg_gen(reg, X86_TYPE_SEG_REG, NULL)
+
+#define log_load_eflags(env) log_load_reg_gen(0, X86_TYPE_EFLAG, env)
+
+#define log_load_eflag_bit(reg, env) log_load_reg_gen(reg, X86_TYPE_EFLAG_BIT, env)
+
 /* Call after the value gets stored */
-static void log_store_reg(uint32_t reg) {
+static void log_store_reg_gen(uint32_t reg, RegisterType rt, /* for eflag */ TCGv_ptr env) {
 #ifdef HAS_TRACEWRAP
-    gen_trace_store_reg(reg, cpu_regs[reg]);
+    /* No need for unnecessary TCGv creation in case of EFLAGS */
+    TCGv_i32 t = (rt == X86_TYPE_EFLAG ? NULL : tcg_const_i32(reg));
+
+    switch (rt) {
+    case X86_TYPE_REG:
+        gen_helper_trace_store_reg(t, cpu_regs[reg]);
+        break;
+    case X86_TYPE_SEG_REG:
+        gen_helper_trace_store_seg_reg(t, cpu_seg_base[reg]);
+        break;
+    case X86_TYPE_EFLAG:
+        gen_helper_trace_store_eflags(env);
+        break;
+    case X86_TYPE_EFLAG_BIT:
+        gen_helper_trace_store_eflag_bit(t, env);
+        break;
+    default:
+        /* unreachable */
+        break;
+    }
+
+    if (rt != X86_TYPE_EFLAG) {
+        tcg_temp_free_i32(t);
+    }
 #endif
 }
+
+#define log_store_reg(reg) log_store_reg_gen(reg, X86_TYPE_REG, NULL)
+
+#define log_store_seg_reg(reg) log_store_reg_gen(reg, X86_TYPE_SEG_REG, NULL)
+
+#define log_store_eflags(env) log_store_reg_gen(0, X86_TYPE_EFLAG, env)
+
+#define log_store_eflag_bit(reg, env) log_store_reg_gen(reg, X86_TYPE_EFLAG_BIT, env)
 
 static void log_load_mem(TCGv val, TCGv addr, MemOp op) {
 #ifdef HAS_TRACEWRAP
@@ -665,6 +722,7 @@ static void gen_lea_v_seg(DisasContext *s, MemOp aflag, TCGv a0,
     }
 
     if (ovr_seg >= 0) {
+        log_load_seg_reg(ovr_seg);
         TCGv seg = cpu_seg_base[ovr_seg];
 
         if (aflag == MO_64) {
@@ -2520,6 +2578,7 @@ static inline void gen_op_movl_seg_T0_vm(DisasContext *s, X86Seg seg_reg)
     tcg_gen_st32_tl(s->T0, cpu_env,
                     offsetof(CPUX86State,segs[seg_reg].selector));
     tcg_gen_shli_tl(cpu_seg_base[seg_reg], s->T0, 4);
+    log_store_seg_reg(seg_reg);
 }
 
 /* move T0 to seg_reg and compute if the CPU state may change. Never
@@ -7960,9 +8019,11 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
 #ifdef TARGET_X86_64
             if (CODE64(s)) {
                 if (check_cpl0(s)) {
+                    log_load_seg_reg(R_GS);
                     tcg_gen_mov_tl(s->T0, cpu_seg_base[R_GS]);
                     tcg_gen_ld_tl(cpu_seg_base[R_GS], cpu_env,
                                   offsetof(CPUX86State, kernelgsbase));
+                    log_store_seg_reg(R_GS);
                     tcg_gen_st_tl(s->T0, cpu_env,
                                   offsetof(CPUX86State, kernelgsbase));
                 }
@@ -8572,6 +8633,7 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
                 tcg_gen_movi_i32(s->tmp2_i32, CR4_FSGSBASE_MASK);
                 gen_helper_cr4_testbit(cpu_env, s->tmp2_i32);
 
+                log_load_seg_reg(modrm & 8 ? R_GS : R_FS);
                 base = cpu_seg_base[modrm & 8 ? R_GS : R_FS];
                 log_load_reg((modrm & 7) | REX_B(s));
                 treg = cpu_regs[(modrm & 7) | REX_B(s)];

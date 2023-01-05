@@ -82,6 +82,26 @@ typedef enum X86Seg {
     R_TR = 7,
 } X86Seg;
 
+typedef enum x86_eflags_t {
+	X86_EFLAGS_CF = 0,
+	X86_EFLAGS_PF = 2,
+	X86_EFLAGS_AF = 4,
+	X86_EFLAGS_ZF = 6,
+	X86_EFLAGS_SF = 7,
+	X86_EFLAGS_TF = 8,
+	X86_EFLAGS_IF = 9,
+	X86_EFLAGS_DF = 10,
+	X86_EFLAGS_OF = 11,
+	X86_EFLAGS_IOPL = 12,
+	X86_EFLAGS_NT = 14,
+	X86_EFLAGS_RF = 16,
+	X86_EFLAGS_VM = 17,
+	X86_EFLAGS_AC = 18,
+	X86_EFLAGS_VIF = 19,
+	X86_EFLAGS_VIP = 20,
+	X86_EFLAGS_ID = 21
+} X86EFlags;
+
 /* segment descriptor fields */
 #define DESC_G_SHIFT    23
 #define DESC_G_MASK     (1 << DESC_G_SHIFT)
@@ -1268,6 +1288,15 @@ typedef struct {
 #define CPU_NB_REGS CPU_NB_REGS64
 #else
 #define CPU_NB_REGS CPU_NB_REGS32
+#endif
+
+#define CPU_NB_EFLAGS64 32
+#define CPU_NB_EFLAGS32 16
+
+#ifdef TARGET_X86_64
+#define CPU_NB_EFLAGS CPU_NB_EFLAGS64
+#else
+#define CPU_NB_EFLAGS CPU_NB_EFLAGS32
 #endif
 
 #define MAX_FIXED_COUNTERS 3
