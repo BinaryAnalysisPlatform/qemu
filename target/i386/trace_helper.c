@@ -48,20 +48,20 @@ static const char* const segs[CPU_NB_SEGS] = {
 };
 
 static const char *eflags[CPU_NB_EFLAGS] = {
-	[X86_EFLAGS_CF] = "CF",
-	[X86_EFLAGS_PF] = "PF",
-	[X86_EFLAGS_AF] = "AF",
-	[X86_EFLAGS_ZF] = "ZF",
-	[X86_EFLAGS_SF] = "SF",
-	[X86_EFLAGS_TF] = "TF",
-	[X86_EFLAGS_IF] = "IF",
-	[X86_EFLAGS_DF] = "DF",
-	[X86_EFLAGS_OF] = "OF",
-	[X86_EFLAGS_NT] = "NT",
+	[EFLAGS_CF] = "CF",
+	[EFLAGS_PF] = "PF",
+	[EFLAGS_AF] = "AF",
+	[EFLAGS_ZF] = "ZF",
+	[EFLAGS_SF] = "SF",
+	[EFLAGS_TF] = "TF",
+	[EFLAGS_IF] = "IF",
+	[EFLAGS_DF] = "DF",
+	[EFLAGS_OF] = "OF",
+	[EFLAGS_NT] = "NT",
 #ifdef TARGET_X86_64
-	[X86_EFLAGS_RF] = "RF",
-	[X86_EFLAGS_VM] = "VM",
-	[X86_EFLAGS_AC] = "AC"
+	[EFLAGS_RF] = "RF",
+	[EFLAGS_VM] = "VM",
+	[EFLAGS_AC] = "AC"
 #endif // TARGET_X86_64
 };
 
