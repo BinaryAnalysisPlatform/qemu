@@ -360,80 +360,88 @@ typedef enum register_type_t {
 } RegisterType;
 
 /* Call before the value gets loaded */
-static void log_load_reg_gen(uint32_t reg, RegisterType rt, /* for eflag */ TCGv_ptr env) {
+static void log_load_reg_gen(RegisterType rt, uint32_t reg, CCOp op) {
 #ifdef HAS_TRACEWRAP
-    /* No need for unnecessary TCGv creation in case of EFLAGS */
-    TCGv_i32 t = (rt == X86_TYPE_EFLAG ? NULL : tcg_const_i32(reg));
+    /* Create TCGv only if necessary */
+    TCGv_i32 tcg_reg = (rt == X86_TYPE_EFLAG ? NULL : tcg_const_i32(reg));
+    TCGv_i32 tcg_cc_op = (rt == X86_TYPE_EFLAG || rt == X86_TYPE_EFLAG_BIT ? tcg_const_i32(op) : NULL);
 
     switch (rt) {
     case X86_TYPE_REG:
-        gen_helper_trace_load_reg(t, cpu_regs[reg]);
+        gen_helper_trace_load_reg(tcg_reg, cpu_regs[reg]);
         break;
     case X86_TYPE_SEG_REG:
-        gen_helper_trace_load_seg_reg(t, cpu_seg_base[reg]);
+        gen_helper_trace_load_seg_reg(tcg_reg, cpu_seg_base[reg]);
         break;
     case X86_TYPE_EFLAG:
-        gen_helper_trace_load_eflags(env);
+        gen_helper_trace_load_eflags(cpu_env, tcg_cc_op);
         break;
     case X86_TYPE_EFLAG_BIT:
-        gen_helper_trace_load_eflag_bit(t, env);
+        gen_helper_trace_load_eflag_bit(tcg_reg, cpu_env, tcg_cc_op);
         break;
     default:
         /* unreachable */
         break;
     }
 
-    if (rt != X86_TYPE_EFLAG) {
-        tcg_temp_free_i32(t);
+    if (tcg_reg) {
+        tcg_temp_free_i32(tcg_reg);
+    }
+    if (tcg_cc_op) {
+        tcg_temp_free_i32(tcg_cc_op);
     }
 #endif
 }
 
-#define log_load_reg(reg) log_load_reg_gen(reg, X86_TYPE_REG, NULL)
+#define log_load_reg(reg) log_load_reg_gen(X86_TYPE_REG, reg, 0)
 
-#define log_load_seg_reg(reg) log_load_reg_gen(reg, X86_TYPE_SEG_REG, NULL)
+#define log_load_seg_reg(reg) log_load_reg_gen(X86_TYPE_SEG_REG, reg, 0)
 
-#define log_load_eflags(env) log_load_reg_gen(0, X86_TYPE_EFLAG, env)
+#define log_load_eflags(op) log_load_reg_gen(X86_TYPE_EFLAG, 0, op)
 
-#define log_load_eflag_bit(reg, env) log_load_reg_gen(reg, X86_TYPE_EFLAG_BIT, env)
+#define log_load_eflag_bit(reg, op) log_load_reg_gen(X86_TYPE_EFLAG_BIT, reg, op)
 
 /* Call after the value gets stored */
-static void log_store_reg_gen(uint32_t reg, RegisterType rt, /* for eflag */ TCGv_ptr env) {
+static void log_store_reg_gen(RegisterType rt, uint32_t reg, CCOp op) {
 #ifdef HAS_TRACEWRAP
-    /* No need for unnecessary TCGv creation in case of EFLAGS */
-    TCGv_i32 t = (rt == X86_TYPE_EFLAG ? NULL : tcg_const_i32(reg));
+    /* Create TCGv only if necessary */
+    TCGv_i32 tcg_reg = (rt == X86_TYPE_EFLAG ? NULL : tcg_const_i32(reg));
+    TCGv_i32 tcg_cc_op = (rt == X86_TYPE_EFLAG || rt == X86_TYPE_EFLAG_BIT ? tcg_const_i32(op) : NULL);
 
     switch (rt) {
     case X86_TYPE_REG:
-        gen_helper_trace_store_reg(t, cpu_regs[reg]);
+        gen_helper_trace_store_reg(tcg_reg, cpu_regs[reg]);
         break;
     case X86_TYPE_SEG_REG:
-        gen_helper_trace_store_seg_reg(t, cpu_seg_base[reg]);
+        gen_helper_trace_store_seg_reg(tcg_reg, cpu_seg_base[reg]);
         break;
     case X86_TYPE_EFLAG:
-        gen_helper_trace_store_eflags(env);
+        gen_helper_trace_store_eflags(cpu_env, tcg_cc_op);
         break;
     case X86_TYPE_EFLAG_BIT:
-        gen_helper_trace_store_eflag_bit(t, env);
+        gen_helper_trace_store_eflag_bit(tcg_reg, cpu_env, tcg_cc_op);
         break;
     default:
         /* unreachable */
         break;
     }
 
-    if (rt != X86_TYPE_EFLAG) {
-        tcg_temp_free_i32(t);
+    if (tcg_reg) {
+        tcg_temp_free_i32(tcg_reg);
+    }
+    if (tcg_cc_op) {
+        tcg_temp_free_i32(tcg_cc_op);
     }
 #endif
 }
 
-#define log_store_reg(reg) log_store_reg_gen(reg, X86_TYPE_REG, NULL)
+#define log_store_reg(reg) log_store_reg_gen(X86_TYPE_REG, reg, 0)
 
-#define log_store_seg_reg(reg) log_store_reg_gen(reg, X86_TYPE_SEG_REG, NULL)
+#define log_store_seg_reg(reg) log_store_reg_gen(X86_TYPE_SEG_REG, reg, 0)
 
-#define log_store_eflags(env) log_store_reg_gen(0, X86_TYPE_EFLAG, env)
+#define log_store_eflags(op) log_store_reg_gen(X86_TYPE_EFLAG, 0, op)
 
-#define log_store_eflag_bit(reg, env) log_store_reg_gen(reg, X86_TYPE_EFLAG_BIT, env)
+#define log_store_eflag_bit(reg, op) log_store_reg_gen(X86_TYPE_EFLAG_BIT, reg, op)
 
 static void log_load_mem(TCGv val, TCGv addr, MemOp op) {
 #ifdef HAS_TRACEWRAP
@@ -450,6 +458,13 @@ static void log_store_mem(TCGv val, TCGv addr, MemOp op) {
     tcg_temp_free_i32(memop);
 #endif
 }
+
+static void log_store_result_flags(CCOp op) {
+    log_store_eflag_bit(EFLAGS_PF, op);
+    log_store_eflag_bit(EFLAGS_SF, op);
+    log_store_eflag_bit(EFLAGS_ZF, op);
+}
+
 
 static void set_cc_op(DisasContext *s, CCOp op)
 {
@@ -934,6 +949,9 @@ static void gen_compute_eflags(DisasContext *s)
     if (s->cc_op == CC_OP_EFLAGS) {
         return;
     }
+
+    log_load_eflags(s->cc_op);
+
     if (s->cc_op == CC_OP_CLR) {
         tcg_gen_movi_tl(cpu_cc_src, CC_Z | CC_P);
         set_cc_op(s, CC_OP_EFLAGS);
@@ -983,6 +1001,8 @@ typedef struct CCPrepare {
 /* compute eflags.C to reg */
 static CCPrepare gen_prepare_eflags_c(DisasContext *s, TCGv reg)
 {
+    log_load_eflag_bit(EFLAGS_CF, s->cc_op);
+
     TCGv t0, t1;
     int size, shift;
 
@@ -1057,6 +1077,8 @@ static CCPrepare gen_prepare_eflags_c(DisasContext *s, TCGv reg)
 /* compute eflags.P to reg */
 static CCPrepare gen_prepare_eflags_p(DisasContext *s, TCGv reg)
 {
+    log_load_eflag_bit(EFLAGS_PF, s->cc_op);
+
     gen_compute_eflags(s);
     return (CCPrepare) { .cond = TCG_COND_NE, .reg = cpu_cc_src,
                          .mask = CC_P };
@@ -1065,6 +1087,8 @@ static CCPrepare gen_prepare_eflags_p(DisasContext *s, TCGv reg)
 /* compute eflags.S to reg */
 static CCPrepare gen_prepare_eflags_s(DisasContext *s, TCGv reg)
 {
+    log_load_eflag_bit(EFLAGS_SF, s->cc_op);
+
     switch (s->cc_op) {
     case CC_OP_DYNAMIC:
         gen_compute_eflags(s);
@@ -1090,6 +1114,8 @@ static CCPrepare gen_prepare_eflags_s(DisasContext *s, TCGv reg)
 /* compute eflags.O to reg */
 static CCPrepare gen_prepare_eflags_o(DisasContext *s, TCGv reg)
 {
+    log_load_eflag_bit(EFLAGS_OF, s->cc_op);
+
     switch (s->cc_op) {
     case CC_OP_ADOX:
     case CC_OP_ADCOX:
@@ -1108,6 +1134,8 @@ static CCPrepare gen_prepare_eflags_o(DisasContext *s, TCGv reg)
 /* compute eflags.Z to reg */
 static CCPrepare gen_prepare_eflags_z(DisasContext *s, TCGv reg)
 {
+    log_load_eflag_bit(EFLAGS_ZF, s->cc_op);
+
     switch (s->cc_op) {
     case CC_OP_DYNAMIC:
         gen_compute_eflags(s);
@@ -1295,6 +1323,11 @@ static inline void gen_jcc1(DisasContext *s, int b, TCGLabel *l1)
         cc.reg = s->T0;
     }
     set_cc_op(s, CC_OP_DYNAMIC);
+
+#ifdef HAS_TRACEWRAP
+    gen_trace_endframe(s);
+#endif
+
     if (cc.use_reg2) {
         tcg_gen_brcond_tl(cc.cond, cc.reg, cc.reg2, l1);
     } else {
@@ -1504,10 +1537,12 @@ static void gen_helper_fp_arith_STN_ST0(int op, int opreg)
 
 static void gen_exception(DisasContext *s, int trapno, target_ulong cur_eip)
 {
+    gen_update_cc_op(s);
+
 #ifdef HAS_TRACEWRAP
     gen_trace_endframe(s);
 #endif
-    gen_update_cc_op(s);
+
     gen_jmp_im(s, cur_eip);
     gen_helper_raise_exception(cpu_env, tcg_const_i32(trapno));
     s->base.is_jmp = DISAS_NORETURN;
@@ -1635,7 +1670,7 @@ static void gen_op(DisasContext *s1, int op, MemOp ot, int d)
         }
         gen_op_update1_cc(s1);
         set_cc_op(s1, CC_OP_LOGICB + ot);
-        break;
+        goto except_af;
     case OP_ORL:
         if (s1->prefix & PREFIX_LOCK) {
             tcg_gen_atomic_or_fetch_tl(s1->T0, s1->A0, s1->T1,
@@ -1646,7 +1681,7 @@ static void gen_op(DisasContext *s1, int op, MemOp ot, int d)
         }
         gen_op_update1_cc(s1);
         set_cc_op(s1, CC_OP_LOGICB + ot);
-        break;
+        goto except_af;
     case OP_XORL:
         if (s1->prefix & PREFIX_LOCK) {
             tcg_gen_atomic_xor_fetch_tl(s1->T0, s1->A0, s1->T1,
@@ -1657,7 +1692,7 @@ static void gen_op(DisasContext *s1, int op, MemOp ot, int d)
         }
         gen_op_update1_cc(s1);
         set_cc_op(s1, CC_OP_LOGICB + ot);
-        break;
+        goto except_af;
     case OP_CMPL:
         tcg_gen_mov_tl(cpu_cc_src, s1->T1);
         tcg_gen_mov_tl(s1->cc_srcT, s1->T0);
@@ -1665,6 +1700,12 @@ static void gen_op(DisasContext *s1, int op, MemOp ot, int d)
         set_cc_op(s1, CC_OP_SUBB + ot);
         break;
     }
+
+    log_store_eflag_bit(EFLAGS_AF, s1->cc_op);
+except_af:
+    log_store_eflag_bit(EFLAGS_OF, s1->cc_op);
+    log_store_eflag_bit(EFLAGS_CF, s1->cc_op);
+    log_store_result_flags(s1->cc_op);
 }
 
 /* if d == OR_TMP0, it means memory operand (address in A0) */
@@ -1692,6 +1733,10 @@ static void gen_inc(DisasContext *s1, MemOp ot, int d, int c)
     gen_compute_eflags_c(s1, cpu_cc_src);
     tcg_gen_mov_tl(cpu_cc_dst, s1->T0);
     set_cc_op(s1, (c > 0 ? CC_OP_INCB : CC_OP_DECB) + ot);
+    
+    log_store_eflag_bit(EFLAGS_AF, s1->cc_op);
+    log_store_eflag_bit(EFLAGS_PF, s1->cc_op);
+    log_store_result_flags(s1->cc_op);
 }
 
 static void gen_shift_flags(DisasContext *s, MemOp ot, TCGv result,
@@ -2125,10 +2170,10 @@ static void gen_shift(DisasContext *s1, int op, MemOp ot, int d, int s)
     switch(op) {
     case OP_ROL:
         gen_rot_rm_T1(s1, ot, d, 0);
-        break;
+        goto no_res;
     case OP_ROR:
         gen_rot_rm_T1(s1, ot, d, 1);
-        break;
+        goto no_res;
     case OP_SHL:
     case OP_SHL1:
         gen_shift_rm_T1(s1, ot, d, 0, 0);
@@ -2141,11 +2186,17 @@ static void gen_shift(DisasContext *s1, int op, MemOp ot, int d, int s)
         break;
     case OP_RCL:
         gen_rotc_rm_T1(s1, ot, d, 0);
-        break;
+        goto no_res;
     case OP_RCR:
         gen_rotc_rm_T1(s1, ot, d, 1);
-        break;
+        goto no_res;
     }
+
+    log_store_result_flags(s1->cc_op);
+
+no_res:
+    log_store_eflag_bit(EFLAGS_CF, s1->cc_op);
+    log_store_eflag_bit(EFLAGS_OF, s1->cc_op);
 }
 
 static void gen_shifti(DisasContext *s1, int op, MemOp ot, int d, int c)
@@ -2153,10 +2204,10 @@ static void gen_shifti(DisasContext *s1, int op, MemOp ot, int d, int c)
     switch(op) {
     case OP_ROL:
         gen_rot_rm_im(s1, ot, d, c, 0);
-        break;
+        goto no_res;
     case OP_ROR:
         gen_rot_rm_im(s1, ot, d, c, 1);
-        break;
+        goto no_res;
     case OP_SHL:
     case OP_SHL1:
         gen_shift_rm_im(s1, ot, d, c, 0, 0);
@@ -2171,8 +2222,17 @@ static void gen_shifti(DisasContext *s1, int op, MemOp ot, int d, int c)
         /* currently not optimized */
         tcg_gen_movi_tl(s1->T1, c);
         gen_shift(s1, op, ot, d, OR_TMP1);
-        break;
+        goto no_trace;
     }
+
+    log_store_result_flags(s1->cc_op);
+
+no_res:
+    log_store_eflag_bit(EFLAGS_CF, s1->cc_op);
+    log_store_eflag_bit(EFLAGS_OF, s1->cc_op);
+
+no_trace:
+    return;
 }
 
 #define X86_MAX_INSN_LENGTH 15
@@ -5096,6 +5156,10 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
             tcg_gen_movi_tl(s->T1, val);
             gen_op_testl_T0_T1_cc(s);
             set_cc_op(s, CC_OP_LOGICB + ot);
+            
+            log_store_result_flags(s->cc_op);
+            log_store_eflag_bit(EFLAGS_CF, s->cc_op);
+            log_store_eflag_bit(EFLAGS_OF, s->cc_op);
             break;
         case 2: /* not */
             if (s->prefix & PREFIX_LOCK) {
@@ -5153,6 +5217,8 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
             }
             gen_op_update_neg_cc(s);
             set_cc_op(s, CC_OP_SUBB + ot);
+
+            log_store_eflag_bit(EFLAGS_CF, s->cc_op);
             break;
         case 4: /* mul */
             switch(ot) {
@@ -5212,6 +5278,9 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
                 break;
 #endif
             }
+
+            log_store_eflag_bit(EFLAGS_OF, s->cc_op);
+            log_store_eflag_bit(EFLAGS_CF, s->cc_op);
             break;
         case 5: /* imul */
             switch(ot) {
@@ -5276,6 +5345,9 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
                 break;
 #endif
             }
+
+            log_store_eflag_bit(EFLAGS_OF, s->cc_op);
+            log_store_eflag_bit(EFLAGS_CF, s->cc_op);
             break;
         case 6: /* div */
             switch(ot) {
@@ -5445,6 +5517,10 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
         gen_op_mov_v_reg(s, ot, s->T1, reg);
         gen_op_testl_T0_T1_cc(s);
         set_cc_op(s, CC_OP_LOGICB + ot);
+
+        log_store_result_flags(s->cc_op);
+        log_store_eflag_bit(EFLAGS_CF, s->cc_op);
+        log_store_eflag_bit(EFLAGS_OF, s->cc_op);
         break;
 
     case 0xa8: /* test eAX, Iv */
@@ -5456,6 +5532,10 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
         tcg_gen_movi_tl(s->T1, val);
         gen_op_testl_T0_T1_cc(s);
         set_cc_op(s, CC_OP_LOGICB + ot);
+
+        log_store_result_flags(s->cc_op);
+        log_store_eflag_bit(EFLAGS_CF, s->cc_op);
+        log_store_eflag_bit(EFLAGS_OF, s->cc_op);
         break;
 
     case 0x98: /* CWDE/CBW */
@@ -5562,6 +5642,9 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
             break;
         }
         set_cc_op(s, CC_OP_MULB + ot);
+
+        log_store_eflag_bit(EFLAGS_CF, s->cc_op);
+        log_store_eflag_bit(EFLAGS_OF, s->cc_op);
         break;
     case 0x1c0:
     case 0x1c1: /* xadd Ev, Gv */
@@ -7365,6 +7448,9 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
         gen_update_cc_op(s);
         gen_helper_daa(cpu_env);
         set_cc_op(s, CC_OP_EFLAGS);
+
+        log_store_eflag_bit(EFLAGS_CF, s->cc_op);
+        log_store_eflag_bit(EFLAGS_OF, s->cc_op);
         break;
     case 0x2f: /* das */
         if (CODE64(s))
@@ -7372,6 +7458,9 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
         gen_update_cc_op(s);
         gen_helper_das(cpu_env);
         set_cc_op(s, CC_OP_EFLAGS);
+
+        log_store_eflag_bit(EFLAGS_CF, s->cc_op);
+        log_store_eflag_bit(EFLAGS_OF, s->cc_op);
         break;
     case 0x37: /* aaa */
         if (CODE64(s))
@@ -7379,6 +7468,9 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
         gen_update_cc_op(s);
         gen_helper_aaa(cpu_env);
         set_cc_op(s, CC_OP_EFLAGS);
+
+        log_store_eflag_bit(EFLAGS_CF, s->cc_op);
+        log_store_eflag_bit(EFLAGS_OF, s->cc_op);
         break;
     case 0x3f: /* aas */
         if (CODE64(s))
@@ -7386,6 +7478,9 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
         gen_update_cc_op(s);
         gen_helper_aas(cpu_env);
         set_cc_op(s, CC_OP_EFLAGS);
+        
+        log_store_eflag_bit(EFLAGS_CF, s->cc_op);
+        log_store_eflag_bit(EFLAGS_OF, s->cc_op);
         break;
     case 0xd4: /* aam */
         if (CODE64(s))
@@ -7396,6 +7491,8 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
         } else {
             gen_helper_aam(cpu_env, tcg_const_i32(val));
             set_cc_op(s, CC_OP_LOGICB);
+
+            log_store_result_flags(s->cc_op);
         }
         break;
     case 0xd5: /* aad */
@@ -7404,6 +7501,8 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
         val = x86_ldub_code(env, s);
         gen_helper_aad(cpu_env, tcg_const_i32(val));
         set_cc_op(s, CC_OP_LOGICB);
+
+        log_store_result_flags(s->cc_op);
         break;
         /************************/
         /* misc */

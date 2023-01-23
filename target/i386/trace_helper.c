@@ -85,7 +85,7 @@ OperandInfo *load_store_reg(uint32_t reg, uint32_t val, int ls) {
     int isSeg = reg & (1 << SEG_BIT);
     reg &= ~(1 << SEG_BIT);
     int isEflag = reg & (1 << EFLAG_BIT);
-    reg &= ~(1 << SEG_BIT);
+    reg &= ~(1 << EFLAG_BIT);
 
     const char* reg_name = NULL;
     if (isSeg) {
@@ -150,9 +150,16 @@ void HELPER(trace_store_reg)(uint32_t reg, target_ulong val)
     qemu_trace_add_operand(oi, 0x2);
 }
 
-void HELPER(trace_load_eflags)(CPUArchState *env)
+void HELPER(trace_load_eflags)(CPUArchState *env, uint32_t /* CCOp */ op)
 {
+    /* Temporarily set the correct cc_op value */
+    CCOp old_op = env->cc_op;
+    env->cc_op = op;
+
     uint32_t val = cpu_compute_eflags(env);
+
+    /* Restore old cc_op */
+    env->cc_op = old_op;
 
 #ifdef TARGET_X86_64
     OperandInfo *oi = load_store_reg64(REG_EFLAGS, val, 0);
@@ -163,9 +170,16 @@ void HELPER(trace_load_eflags)(CPUArchState *env)
     qemu_trace_add_operand(oi, 0x1);
 }
 
-void HELPER(trace_store_eflags)(CPUArchState *env)
+void HELPER(trace_store_eflags)(CPUArchState *env, uint32_t /* CCOp */ op)
 {
+    /* Temporarily set the correct cc_op value */
+    CCOp old_op = env->cc_op;
+    env->cc_op = op;
+
     uint32_t val = cpu_compute_eflags(env);
+
+    /* Restore old cc_op */
+    env->cc_op = old_op;
 
 #ifdef TARGET_X86_64
     OperandInfo *oi = load_store_reg64(REG_EFLAGS, val, 1);
@@ -247,9 +261,17 @@ void HELPER(trace_store_seg_reg)(uint32_t reg, target_ulong val) {
     qemu_trace_add_operand(oi, 0x2);
 }
 
-void HELPER(trace_load_eflag_bit)(uint32_t /* X86EFlags */ reg, CPUArchState *env)
+void HELPER(trace_load_eflag_bit)(uint32_t /* X86EFlags */ reg, CPUArchState *env, uint32_t /* CCOp */ op)
 {
+    /* Temporarily set the correct cc_op value */
+    CCOp old_op = env->cc_op;
+    env->cc_op = op;
+
     uint32_t val =  (cpu_compute_eflags(env) >> reg) & 1;
+
+    /* Restore old cc_op */
+    env->cc_op = old_op;
+
     qemu_log("The flag bit (eflag%u) was read. Value 0x%08x\n", reg, val);
 
 #ifdef TARGET_X86_64
@@ -261,9 +283,17 @@ void HELPER(trace_load_eflag_bit)(uint32_t /* X86EFlags */ reg, CPUArchState *en
     qemu_trace_add_operand(oi, 0x1);
 }
 
-void HELPER(trace_store_eflag_bit)(uint32_t /* X86EFlags */ reg, CPUArchState *env)
+void HELPER(trace_store_eflag_bit)(uint32_t /* X86EFlags */ reg, CPUArchState *env, uint32_t /* CCOp */ op)
 {
+    /* Temporarily set the correct cc_op value */
+    CCOp old_op = env->cc_op;
+    env->cc_op = op;
+
     uint32_t val =  (cpu_compute_eflags(env) >> reg) & 1;
+
+    /* Restore old cc_op */
+    env->cc_op = old_op;
+
     qemu_log("The flag bit (eflag%u) was written. Value 0x%08x\n", reg, val);
 
 #ifdef TARGET_X86_64
