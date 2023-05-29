@@ -950,8 +950,6 @@ static void gen_compute_eflags(DisasContext *s)
         return;
     }
 
-    log_load_eflags(s->cc_op);
-
     if (s->cc_op == CC_OP_CLR) {
         tcg_gen_movi_tl(cpu_cc_src, CC_Z | CC_P);
         set_cc_op(s, CC_OP_EFLAGS);
@@ -1183,6 +1181,9 @@ static CCPrepare gen_prepare_cc(DisasContext *s, int b, TCGv reg)
             t0 = gen_ext_tl(s->tmp0, cpu_cc_src, size, false);
             cc = (CCPrepare) { .cond = TCG_COND_LEU, .reg = s->tmp4,
                                .reg2 = t0, .mask = -1, .use_reg2 = true };
+            
+            log_load_eflag_bit(EFLAGS_CF, s->cc_op);
+            log_load_eflag_bit(EFLAGS_ZF, s->cc_op);
             break;
 
         case JCC_L:
@@ -1218,6 +1219,8 @@ static CCPrepare gen_prepare_cc(DisasContext *s, int b, TCGv reg)
             break;
         case JCC_BE:
             gen_compute_eflags(s);
+            log_load_eflag_bit(EFLAGS_ZF, s->cc_op);
+            log_load_eflag_bit(EFLAGS_CF, s->cc_op);
             cc = (CCPrepare) { .cond = TCG_COND_NE, .reg = cpu_cc_src,
                                .mask = CC_Z | CC_C };
             break;
@@ -1234,6 +1237,7 @@ static CCPrepare gen_prepare_cc(DisasContext *s, int b, TCGv reg)
             }
             tcg_gen_shri_tl(reg, cpu_cc_src, 4); /* CC_O -> CC_S */
             tcg_gen_xor_tl(reg, reg, cpu_cc_src);
+            log_load_eflag_bit(EFLAGS_SF, s->cc_op);
             cc = (CCPrepare) { .cond = TCG_COND_NE, .reg = reg,
                                .mask = CC_S };
             break;
@@ -1245,6 +1249,8 @@ static CCPrepare gen_prepare_cc(DisasContext *s, int b, TCGv reg)
             }
             tcg_gen_shri_tl(reg, cpu_cc_src, 4); /* CC_O -> CC_S */
             tcg_gen_xor_tl(reg, reg, cpu_cc_src);
+            log_load_eflag_bit(EFLAGS_SF, s->cc_op);
+            log_load_eflag_bit(EFLAGS_ZF, s->cc_op);
             cc = (CCPrepare) { .cond = TCG_COND_NE, .reg = reg,
                                .mask = CC_S | CC_Z };
             break;
@@ -5043,6 +5049,10 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
                     set_cc_op(s, CC_OP_CLR);
                     tcg_gen_movi_tl(s->T0, 0);
                     gen_op_mov_reg_v(s, ot, reg, s->T0);
+
+                    log_store_result_flags(s->cc_op);
+                    log_store_eflag_bit(EFLAGS_CF, s->cc_op);
+                    log_store_eflag_bit(EFLAGS_OF, s->cc_op);
                     break;
                 } else {
                     opreg = rm;
@@ -7230,23 +7240,29 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
         break;
     case 0xf5: /* cmc */
         gen_compute_eflags(s);
+        log_load_eflag_bit(EFLAGS_CF, s->cc_op);
         tcg_gen_xori_tl(cpu_cc_src, cpu_cc_src, CC_C);
+        log_store_eflag_bit(EFLAGS_CF, s->cc_op);
         break;
     case 0xf8: /* clc */
         gen_compute_eflags(s);
         tcg_gen_andi_tl(cpu_cc_src, cpu_cc_src, ~CC_C);
+        log_store_eflag_bit(EFLAGS_CF, s->cc_op);
         break;
     case 0xf9: /* stc */
         gen_compute_eflags(s);
         tcg_gen_ori_tl(cpu_cc_src, cpu_cc_src, CC_C);
+        log_store_eflag_bit(EFLAGS_CF, s->cc_op);
         break;
     case 0xfc: /* cld */
         tcg_gen_movi_i32(s->tmp2_i32, 1);
         tcg_gen_st_i32(s->tmp2_i32, cpu_env, offsetof(CPUX86State, df));
+        log_load_eflag_bit(EFLAGS_DF, s->cc_op);
         break;
     case 0xfd: /* std */
         tcg_gen_movi_i32(s->tmp2_i32, -1);
         tcg_gen_st_i32(s->tmp2_i32, cpu_env, offsetof(CPUX86State, df));
+        log_load_eflag_bit(EFLAGS_DF, s->cc_op);
         break;
 
         /************************/
