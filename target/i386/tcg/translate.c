@@ -1251,6 +1251,7 @@ static CCPrepare gen_prepare_cc(DisasContext *s, int b, TCGv reg)
             tcg_gen_xor_tl(reg, reg, cpu_cc_src);
             log_load_eflag_bit(EFLAGS_SF, s->cc_op);
             log_load_eflag_bit(EFLAGS_ZF, s->cc_op);
+            log_load_eflag_bit(EFLAGS_OF, s->cc_op);
             cc = (CCPrepare) { .cond = TCG_COND_NE, .reg = reg,
                                .mask = CC_S | CC_Z };
             break;
@@ -7437,6 +7438,7 @@ static target_ulong disas_insn(DisasContext *s, CPUState *cpu)
                to the input and not the result.  */
             tcg_gen_mov_tl(cpu_cc_dst, s->T0);
             set_cc_op(s, CC_OP_LOGICB + ot);
+            log_store_eflag_bit(EFLAGS_ZF, s->cc_op);
 
             /* ??? The manual says that the output is undefined when the
                input is zero, but real hardware leaves it unchanged, and
