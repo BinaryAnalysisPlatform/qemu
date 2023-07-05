@@ -4,7 +4,7 @@ Qemu tracer - a tracer based on [qemu](https://github.com/qemu/qemu)
 project. It executes a binary executable and saves trace data using
 [Protocol Buffer](https://developers.google.com/protocol-buffers/)
 format. The contents of the trace data is defined in
-[bap-traces](https://github.com/BinaryAnalysisPlatform/bap-traces)
+[bap-frames](https://github.com/BinaryAnalysisPlatform/bap-frames)
 project.
 
 # Installing released binaries
@@ -34,7 +34,7 @@ tar -C $HOME -xf qemu-tracewrap-ubuntu-14.04.4-LTS.tgz
 ## Preparation
 
 Note: the instructions assume that you're using Ubuntu, but it
-may work on other systems, that uses apt-get.
+may work on other systems, that uses `apt-get`.
 
 Before building the qemu-tracewrap, you need to install the following packages:
    * qemu build dependencies
