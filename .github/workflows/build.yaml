@@ -30,10 +30,17 @@ jobs:
     - name: Install piqi
       run: |
         opam install piqi
-    - name: Clone qemu and bap-frames
-      run: |
-        git clone --depth 1 http://github.com/BinaryAnalysisPlatform/bap-frames.git
-        git clone --depth 1 http://github.com/BinaryAnalysisPlatform/qemu.git
+    - name: Checkout bap-frames
+      uses: actions/checkout@v4
+      with:
+        repository: BinaryAnalysisPlatform/bap-frames
+        path: bap-frames
+    - name: Checkout qemu
+      uses: actions/checkout@v4
+      with:
+        repository: BinaryAnalysisPlatform/qemu
+        path: qemu
+        ref: tracewrap-8.1-hexagon
     - name: Build for Hexagon
       run: |
         cd qemu
