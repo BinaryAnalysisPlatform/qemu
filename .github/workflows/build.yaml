@@ -19,7 +19,7 @@ jobs:
       run: |
         sudo apt-get  update
         sudo apt-get --no-install-recommends -y build-dep qemu
-        sudo apt-get install -y autoconf libtool protobuf-c-compiler
+        sudo apt-get install -y autoconf libtool protobuf-c-compiler libprotobuf-c-dev
         pip3 install --user ninja
     - name: Install OCaml
       uses: ocaml/setup-ocaml@v2
@@ -30,12 +30,18 @@ jobs:
     - name: Install piqi
       run: |
         opam install piqi
-    - name: Clone qemu and bap-frames
-      run: |
-        git clone --depth 1 http://github.com/BinaryAnalysisPlatform/bap-frames.git
-        git clone --depth 1 http://github.com/BinaryAnalysisPlatform/qemu.git
-    - name: Build without tracewrap
+    - name: Checkout bap-frames
+      uses: actions/checkout@v4
+      with:
+        repository: BinaryAnalysisPlatform/bap-frames
+        path: bap-frames
+    - name: Checkout qemu
+      uses: actions/checkout@v4
+      with:
+        repository: BinaryAnalysisPlatform/qemu
+        path: qemu
+    - name: Build for Hexagon
       run: |
         cd qemu
-        ./configure --prefix=$HOME --target-list=arm-linux-user
+        opam exec -- ./configure --prefix=$HOME --with-tracewrap="$GITHUB_WORKSPACE"/bap-frames --target-list=hexagon-linux-user
         ninja -C build

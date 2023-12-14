@@ -50,6 +50,7 @@ meson_options_help() {
   printf "%s\n" '                           Set available tracing backends [log] (choices:'
   printf "%s\n" '                           dtrace/ftrace/log/nop/simple/syslog/ust)'
   printf "%s\n" '  --enable-tsan            enable thread sanitizer'
+  printf "%s\n" '  --enable-tracewrap       tracewrap (bap-frames) compression support'
   printf "%s\n" '  --firmwarepath=VALUES    search PATH for firmware files [share/qemu-'
   printf "%s\n" '                           firmware]'
   printf "%s\n" '  --iasl=VALUE             Path to ACPI disassembler'
@@ -66,6 +67,7 @@ meson_options_help() {
   printf "%s\n" '                           [NORMAL]'
   printf "%s\n" '  --with-coroutine=CHOICE  coroutine backend to use (choices:'
   printf "%s\n" '                           auto/sigaltstack/ucontext/windows)'
+  printf "%s\n" '  --tracewrap-dir=VALUE    path to bap-frames'
   printf "%s\n" '  --with-pkgversion=VALUE  use specified string as sub-version of the'
   printf "%s\n" '                           package'
   printf "%s\n" '  --with-trace-file=VALUE  Trace file prefix for simple backend [trace]'
@@ -468,6 +470,9 @@ _meson_option_parse() {
     --with-trace-file=*) quote_sh "-Dtrace_file=$2" ;;
     --enable-tsan) printf "%s" -Dtsan=true ;;
     --disable-tsan) printf "%s" -Dtsan=false ;;
+    --enable-tracewrap) printf "%s" -Dtracewrap=true ;;
+    --disable-tracewrap) printf "%s" -Dtracewrap=false ;;
+    --tracewrap-dir=*) quote_sh "-Dtracewrap_dir=$2" ;;
     --enable-u2f) printf "%s" -Du2f=enabled ;;
     --disable-u2f) printf "%s" -Du2f=disabled ;;
     --enable-usb-redir) printf "%s" -Dusb_redir=enabled ;;

@@ -1762,6 +1762,13 @@ void gen_load(Context *c, YYLTYPE *locp, HexValue *width,
         OUT(c, locp, " | MO_SIGN");
     }
     OUT(c, locp, " | MO_TE);\n");
+    OUT(c, locp, "gen_helper_trace_load_mem");
+    OUT(c, locp, (dst_bit_width == 64) ? "_64(" : "(");
+    OUT(c, locp, ea, ", ", dst, ", tcg_constant_i32(MO_", &src_bit_width);
+    if (signedness == SIGNED) {
+        OUT(c, locp, " | MO_SIGN");
+    }
+    OUT(c, locp, " | MO_TE));\n");
 }
 
 void gen_store(Context *c, YYLTYPE *locp, HexValue *width, HexValue *ea,

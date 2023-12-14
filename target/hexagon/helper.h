@@ -110,3 +110,44 @@ DEF_HELPER_4(probe_noshuf_load, void, env, i32, int, int)
 DEF_HELPER_2(probe_pkt_scalar_store_s0, void, env, int)
 DEF_HELPER_2(probe_hvx_stores, void, env, int)
 DEF_HELPER_2(probe_pkt_scalar_hvx_stores, void, env, int)
+
+#ifdef HAS_TRACEWRAP
+// Frames
+// name, return type, (CPU env), address
+DEF_HELPER_1(trace_newframe, void, tl)
+DEF_HELPER_3(trace_endframe, void, env, tl, i32)
+
+// Memory
+// name, return type, address, val, width
+DEF_HELPER_3(trace_load_mem, void, tl, tl, i32)
+DEF_HELPER_3(trace_store_mem, void, tl, tl, i32)
+DEF_HELPER_3(trace_load_mem_64, void, tl, i64, i32)
+DEF_HELPER_3(trace_store_mem_64, void, tl, i64, i32)
+
+// GPRs
+// name, return type, reg, val, (load_new)
+DEF_HELPER_2(trace_load_reg, void, i32, i32)
+DEF_HELPER_2(trace_load_reg_new, void, i32, i32)
+DEF_HELPER_2(trace_store_reg, void, i32, i32)
+DEF_HELPER_2(trace_store_reg_new, void, i32, i32)
+
+// VRegs
+// name, return type, vreg, val, load_new
+DEF_HELPER_2(trace_load_vreg, void, i32, ptr)
+DEF_HELPER_2(trace_load_vreg_new, void, i32, ptr)
+DEF_HELPER_2(trace_store_vreg, void, i32, ptr)
+// DEF_HELPER_2(trace_store_vreg_new, void, i32, ptr)
+
+// Predicates
+// name, return type, pred reg, val, load_new
+DEF_HELPER_2(trace_load_pred, void, i32, tl)
+DEF_HELPER_2(trace_load_pred_new, void, i32, tl)
+DEF_HELPER_2(trace_store_pred, void, i32, tl)
+DEF_HELPER_2(trace_store_pred_new, void, i32, tl)
+
+DEF_HELPER_2(trace_load_vpred, void, i32, ptr)
+DEF_HELPER_2(trace_load_vpred_new, void, i32, ptr)
+DEF_HELPER_2(trace_store_vpred, void, i32, ptr)
+// DEF_HELPER_2(trace_store_vpred_new, void, i32, ptr)
+
+#endif /* HAS_TRACEWRAP */

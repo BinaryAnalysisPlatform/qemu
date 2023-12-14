@@ -40,7 +40,6 @@ def genptr_decl_pair_writable(f, tag, regtype, regid, regno):
         hex_common.bad_register(regtype, regid)
     f.write(f"    TCGv_i64 {regtype}{regid}V = " f"get_result_gpr_pair(ctx, {regN});\n")
 
-
 def genptr_decl_writable(f, tag, regtype, regid, regno):
     regN = f"{regtype}{regid}N"
     if regtype == "R":
@@ -276,6 +275,7 @@ def genptr_src_read(f, tag, regtype, regid):
         elif regid not in {"s", "t", "u", "v"}:
             hex_common.bad_register(regtype, regid)
     elif regtype == "C":
+        # BAP tracing: Done in gen_read_ctrl_reg_...
         if regid == "ss":
             f.write(
                 f"    gen_read_ctrl_reg_pair(ctx, {regtype}{regid}N, "
@@ -387,6 +387,7 @@ def gen_helper_call_imm(f, immlett):
 
 
 def genptr_dst_write_pair(f, tag, regtype, regid):
+    # BAP tracing: Done in gen_log_reg_write_pair
     f.write(f"    gen_log_reg_write_pair(ctx, {regtype}{regid}N, "
             f"{regtype}{regid}V);\n")
 

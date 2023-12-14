@@ -154,7 +154,7 @@ static void gen_goto_tb(DisasContext *ctx, int idx, target_ulong dest, bool
 static void gen_end_tb(DisasContext *ctx)
 {
     Packet *pkt = ctx->pkt;
-
+    gen_helper_trace_endframe(cpu_env, tcg_constant_tl(pkt->pc), tcg_constant_i32(pkt->encod_pkt_size_in_bytes/4));
     gen_exec_counters(ctx);
 
     if (ctx->branch_cond != TCG_COND_NEVER) {
@@ -188,6 +188,7 @@ static void gen_end_tb(DisasContext *ctx)
 
 static void gen_exception_end_tb(DisasContext *ctx, int excp)
 {
+    gen_helper_trace_endframe(cpu_env, tcg_constant_tl(ctx->base.pc_next), tcg_constant_i32(0));
     gen_exec_counters(ctx);
     tcg_gen_movi_tl(hex_gpr[HEX_REG_PC], ctx->next_PC);
     gen_exception_raw(excp);
@@ -520,6 +521,19 @@ static void gen_start_packet(DisasContext *ctx)
     }
 
     analyze_packet(ctx);
+    for (int i = 0; i < TOTAL_PER_THREAD_REGS; ++i) {
+        if (i == HEX_REG_PC) {
+            gen_helper_trace_load_reg(tcg_constant_i32(i), tcg_constant_tl(next_PC - pkt->encod_pkt_size_in_bytes));
+            gen_helper_trace_load_reg_new(tcg_constant_i32(i), tcg_constant_tl(next_PC - pkt->encod_pkt_size_in_bytes));
+            continue;
+        }
+        gen_helper_trace_load_reg(tcg_constant_i32(i), hex_gpr[i]);
+        gen_helper_trace_load_reg_new(tcg_constant_i32(i), hex_gpr[i]);
+    }
+    for (int i = 0; i < NUM_PREGS; ++i) {
+        gen_helper_trace_load_pred(tcg_constant_i32(i), hex_pred[i]);
+        gen_helper_trace_load_pred_new(tcg_constant_i32(i), hex_pred[i]);
+    }
 
     /*
      * pregs_written is used both in the analyze phase as well as the code
@@ -571,7 +585,7 @@ static void gen_start_packet(DisasContext *ctx)
             int pred_num = ctx->preg_log[i];
             ctx->new_pred_value[pred_num] = tcg_temp_new();
             tcg_gen_mov_tl(ctx->new_pred_value[pred_num], hex_pred[pred_num]);
-        }
+       }
     }
 
     /* Preload the predicated HVX registers into future_VRegs and tmp_VRegs */
@@ -673,6 +687,13 @@ static void gen_reg_writes(DisasContext *ctx)
         int reg_num = ctx->reg_log[i];
 
         tcg_gen_mov_tl(hex_gpr[reg_num], get_result_gpr(ctx, reg_num));
+        if (reg_num != HEX_REG_PC && reg_num != HEX_REG_LC0) {
+            // PC writes are not tracked.
+            // LC0 is never tracked, because at this point it doesn't necessarily
+            // hold the correct value.
+            // Due to direct blocck chaining, it might hold the not decremented value.
+            gen_helper_trace_store_reg(tcg_constant_i32(reg_num), hex_gpr[reg_num]);
+        }
 
         /*
          * ctx->is_tight_loop is set when SA0 points to the beginning of the TB.
@@ -694,6 +715,7 @@ static void gen_pred_writes(DisasContext *ctx)
     for (int i = 0; i < ctx->preg_log_idx; i++) {
         int pred_num = ctx->preg_log[i];
         tcg_gen_mov_tl(hex_pred[pred_num], ctx->new_pred_value[pred_num]);
+        gen_helper_trace_store_pred(tcg_constant_i32(pred_num), hex_pred[pred_num]);
     }
 }
 
@@ -757,24 +779,28 @@ void process_store(DisasContext *ctx, int slot_num)
             tcg_gen_qemu_st_tl(hex_store_val32[slot_num],
                                hex_store_addr[slot_num],
                                ctx->mem_idx, MO_UB);
+            gen_helper_trace_store_mem(hex_store_addr[slot_num], hex_store_val32[slot_num], tcg_constant_i32(MO_UB));
             break;
         case 2:
             gen_check_store_width(ctx, slot_num);
             tcg_gen_qemu_st_tl(hex_store_val32[slot_num],
                                hex_store_addr[slot_num],
                                ctx->mem_idx, MO_TEUW);
+            gen_helper_trace_store_mem(hex_store_addr[slot_num], hex_store_val32[slot_num], tcg_constant_i32(MO_TEUW));
             break;
         case 4:
             gen_check_store_width(ctx, slot_num);
             tcg_gen_qemu_st_tl(hex_store_val32[slot_num],
                                hex_store_addr[slot_num],
                                ctx->mem_idx, MO_TEUL);
+            gen_helper_trace_store_mem(hex_store_addr[slot_num], hex_store_val32[slot_num], tcg_constant_i32(MO_TEUL));
             break;
         case 8:
             gen_check_store_width(ctx, slot_num);
             tcg_gen_qemu_st_i64(hex_store_val64[slot_num],
                                 hex_store_addr[slot_num],
                                 ctx->mem_idx, MO_TEUQ);
+            gen_helper_trace_store_mem_64(hex_store_addr[slot_num], hex_store_val64[slot_num], tcg_constant_i32(MO_TEUQ));
             break;
         default:
             {
@@ -1028,6 +1054,7 @@ static void decode_and_translate_packet(CPUHexagonState *env, DisasContext *ctx)
     Packet pkt;
     int i;
 
+    gen_helper_trace_newframe(tcg_constant_tl(ctx->base.pc_next));
     nwords = read_packet_words(env, ctx, words);
     if (!nwords) {
         gen_exception_end_tb(ctx, HEX_EXCP_INVALID_PACKET);
@@ -1045,6 +1072,7 @@ static void decode_and_translate_packet(CPUHexagonState *env, DisasContext *ctx)
         }
         gen_commit_packet(ctx);
         ctx->base.pc_next += pkt.encod_pkt_size_in_bytes;
+        gen_helper_trace_endframe(cpu_env, tcg_constant_tl(pkt.pc), tcg_constant_i32(nwords));
     } else {
         gen_exception_end_tb(ctx, HEX_EXCP_INVALID_PACKET);
     }

@@ -104,15 +104,19 @@ void HELPER(commit_store)(CPUHexagonState *env, int slot_num)
     switch (width) {
     case 1:
         cpu_stb_data_ra(env, va, env->mem_log_stores[slot_num].data32, ra);
+        HELPER(trace_store_mem)(va, env->mem_log_stores[slot_num].data32, size_memop(width));
         break;
     case 2:
         cpu_stw_data_ra(env, va, env->mem_log_stores[slot_num].data32, ra);
+        HELPER(trace_store_mem)(va, env->mem_log_stores[slot_num].data32, size_memop(width));
         break;
     case 4:
         cpu_stl_data_ra(env, va, env->mem_log_stores[slot_num].data32, ra);
+        HELPER(trace_store_mem)(va, env->mem_log_stores[slot_num].data32, size_memop(width));
         break;
     case 8:
         cpu_stq_data_ra(env, va, env->mem_log_stores[slot_num].data64, ra);
+        HELPER(trace_store_mem_64)(va, env->mem_log_stores[slot_num].data64, size_memop(width));
         break;
     default:
         g_assert_not_reached();
@@ -581,7 +585,9 @@ uint8_t mem_load1(CPUHexagonState *env, bool pkt_has_store_s1,
 {
     uintptr_t ra = GETPC();
     check_noshuf(env, pkt_has_store_s1, slot, vaddr, 1);
-    return cpu_ldub_data_ra(env, vaddr, ra);
+    uint8_t val = cpu_ldub_data_ra(env, vaddr, ra);
+    HELPER(trace_load_mem)(vaddr, val, MO_8);
+    return val;
 }
 
 uint16_t mem_load2(CPUHexagonState *env, bool pkt_has_store_s1,
@@ -589,7 +595,9 @@ uint16_t mem_load2(CPUHexagonState *env, bool pkt_has_store_s1,
 {
     uintptr_t ra = GETPC();
     check_noshuf(env, pkt_has_store_s1, slot, vaddr, 2);
-    return cpu_lduw_data_ra(env, vaddr, ra);
+    uint16_t val = cpu_lduw_data_ra(env, vaddr, ra);
+    HELPER(trace_load_mem)(vaddr, val, MO_16);
+    return val;
 }
 
 uint32_t mem_load4(CPUHexagonState *env, bool pkt_has_store_s1,
@@ -597,7 +605,9 @@ uint32_t mem_load4(CPUHexagonState *env, bool pkt_has_store_s1,
 {
     uintptr_t ra = GETPC();
     check_noshuf(env, pkt_has_store_s1, slot, vaddr, 4);
-    return cpu_ldl_data_ra(env, vaddr, ra);
+    uint32_t val = cpu_ldl_data_ra(env, vaddr, ra);
+    HELPER(trace_load_mem)(vaddr, val, MO_32);
+    return val;
 }
 
 uint64_t mem_load8(CPUHexagonState *env, bool pkt_has_store_s1,
@@ -605,7 +615,9 @@ uint64_t mem_load8(CPUHexagonState *env, bool pkt_has_store_s1,
 {
     uintptr_t ra = GETPC();
     check_noshuf(env, pkt_has_store_s1, slot, vaddr, 8);
-    return cpu_ldq_data_ra(env, vaddr, ra);
+    uint64_t val = cpu_ldq_data_ra(env, vaddr, ra);
+    HELPER(trace_load_mem_64)(vaddr, val, size_memop(8));
+    return val;
 }
 
 /* Floating point */
