@@ -1,0 +1,48 @@
+piqi = find_program('piqi')
+protoc_c = find_program('protoc-c')
+
+# piqi -> protobuf file.
+piqi_src = custom_target('piqi',
+  input: 'bap-frames/piqi/frame.piqi',
+  output: 'frame.piqi.proto',
+  command: [piqi, 'to-proto', '@INPUT@', '-o', '@OUTPUT@'])
+
+# protobuf file -> C code
+proto_src_raw = custom_target('proto',
+  input: piqi_src,
+  output: ['frame.piqi.pb-c.c', 'frame.piqi.pb-c.h'],
+  command: [protoc_c, '--c_out=.', '@INPUT@'],
+  depends: piqi_src)
+
+# Patch protobuf header: base -> __base.
+# Necessary for the C build.
+# See fix_proto_src.py
+proto_src = custom_target(
+  input: proto_src_raw,
+  output: ['frame.piqi.pb-c-patched.c', 'frame.piqi.pb-c-patched.h'],
+  command: [files('fix_proto_src.py'), '@INPUT@', '-o', '@OUTPUT@'],
+  depends: proto_src_raw
+)
+
+libprotobuf = static_library('protobuf', [proto_src], pic: true)
+dep_libprotobuf = declare_dependency(
+    sources : proto_src,
+    link_with : [libprotobuf],
+)
+
+bap_tracing_src = files(
+  'tracing.c',
+  'tracewrap.c',
+)
+
+if host_os == 'windows'
+  plugin_modules += shared_module('bap_tracing', bap_tracing_src,
+                    include_directories: '../../../include/qemu',
+                    link_depends: [win32_qemu_plugin_api_lib],
+                    link_args: win32_qemu_plugin_api_link_flags,
+                    dependencies: [glib, dep_libprotobuf])
+else
+  plugin_modules += shared_module('bap_tracing', bap_tracing_src,
+                    include_directories: '../../../include/qemu',
+                    dependencies: [glib, dep_libprotobuf])
+endif

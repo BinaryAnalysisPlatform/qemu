@@ -1,13 +1,8 @@
 #pragma once
 
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 
-#include "qemu/osdep.h"
-#include "cpu.h"
-
-#include "frame.piqi.pb-c.h"
+#include "frame.piqi.pb-c-patched.h"
 
 
 /** initializes trace subsystem.
@@ -37,13 +32,13 @@ void qemu_trace_init(const char *filename, const char *targetname,
                      char **argv, char **envp,
                      char **target_argv,
                      char **target_envp);
-void qemu_trace_newframe(target_ulong addr, int tread_id);
+void qemu_trace_newframe(uint64_t addr, int tread_id);
 void qemu_trace_add_operand(OperandInfo *oi, int inout);
-void qemu_trace_endframe(CPUArchState *env, target_ulong pc, target_ulong size);
+void qemu_trace_endframe(void *env, uint64_t pc, uint64_t size);
 void qemu_trace_finish(uint32_t exit_code);
 
-OperandInfo * load_store_reg(target_ulong reg, target_ulong val, int ls);
-OperandInfo * load_store_mem(target_ulong addr, target_ulong val, int ls, int len);
+OperandInfo * load_store_reg(uint64_t reg, uint64_t val, int ls);
+OperandInfo * load_store_mem(uint64_t addr, uint64_t val, int ls, int len);
 
 #define REG_EFLAGS 66
 #define REG_LO 33

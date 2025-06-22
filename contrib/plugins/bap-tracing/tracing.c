@@ -19,6 +19,8 @@ typedef struct {
 
 static TraceState state;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 static VCPU *get_vcpu(TraceState *state, int vcpu_index) {
   VCPU *c;
   g_rw_lock_reader_lock(&state->vcpus_array_lock);
@@ -27,6 +29,7 @@ static VCPU *get_vcpu(TraceState *state, int vcpu_index) {
 
   return c;
 }
+#pragma GCC diagnostic pop
 
 static void log_insn_frame(unsigned int cpu_index, void *udata) {
   // VCPU *vcpu = get_vcpu(state, cpu_index);
