@@ -8,7 +8,7 @@
 
 QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
 
-#define FRAME_BUFFER_SIZE 1024
+#define FRAME_BUFFER_SIZE_DEFAULT 1024
 
 typedef struct {
   Frame **fbuf;

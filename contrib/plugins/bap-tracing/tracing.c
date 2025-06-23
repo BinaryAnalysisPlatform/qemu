@@ -89,7 +89,7 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
                                            const qemu_info_t *info, int argc,
                                            char **argv) {
   const char *target_path = "/tmp/test.trace";
-  state.frame_buffer = frame_buffer_init(FRAME_BUFFER_SIZE);
+  state.frame_buffer = frame_buffer_init(FRAME_BUFFER_SIZE_DEFAULT);
   state.vcpus = g_array_new(false, true, sizeof(VCPU));
   state.file = fopen(target_path, "r");
   if (!(state.frame_buffer || state.vcpus || state.file)) {
