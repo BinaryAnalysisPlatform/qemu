@@ -22,3 +22,21 @@ Frame *frame_new_std(uint64_t addr, int vcpu_id) {
   sframe->operand_post_list = ol_out;
   return frame;
 }
+
+void frame_add_operand(Frame *frame, OperandInfo *oi, bool is_post) {
+    OperandValueList *ol;
+    if (is_post) {
+        ol = frame->std_frame->operand_post_list;
+    } else {
+        ol = frame->std_frame->operand_pre_list;
+    }
+
+    oi->taint_info = g_new(TaintInfo, 1);
+    taint_info__init(oi->taint_info);
+    oi->taint_info->no_taint = 1;
+    oi->taint_info->has_no_taint = 1;
+
+    ol->n_elem += 1;
+    ol->elem = g_renew(OperandInfo *, ol->elem, ol->n_elem);
+    ol->elem[ol->n_elem - 1] = oi;
+}

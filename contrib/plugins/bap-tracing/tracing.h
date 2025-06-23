@@ -61,4 +61,6 @@ Frame **frame_buffer_flush(FrameBuffer *buf, size_t *fbuf_size);
  */
 Frame *frame_new_std(uint64_t addr, int vcpu_id);
 
+void frame_add_operand(Frame *frame, OperandInfo *oi, bool is_out);
+
 #endif
