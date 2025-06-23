@@ -10,15 +10,26 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
 
 #define FRAME_BUFFER_SIZE_DEFAULT 1024
 
+/**
+ * \brief VLIW architecture have instructions longer than 4 or 8bytes.
+ */
+#define MAX_INSTRUCTION_SIZE 64
+
 typedef struct {
   Frame **fbuf;
   size_t len;
 } FrameBuffer;
 
 typedef struct {
-    struct qemu_plugin_register *handle; ///< Passed to qemu API.
-    GByteArray *content;
-    const char *name;
+  uint8_t bytes[MAX_INSTRUCTION_SIZE]; ///< Instruction bytes.
+  size_t size; ///< Len of instruction in bytes.
+  uint64_t vaddr;
+} Instruction;
+
+typedef struct {
+  struct qemu_plugin_register *handle; ///< Passed to qemu API.
+  GByteArray *content;
+  const char *name;
 } Register;
 
 typedef struct {
@@ -62,5 +73,8 @@ Frame **frame_buffer_flush(FrameBuffer *buf, size_t *fbuf_size);
 Frame *frame_new_std(uint64_t addr, int vcpu_id);
 
 void frame_add_operand(Frame *frame, OperandInfo *oi, bool is_out);
+
+Register *init_vcpu_register(qemu_plugin_reg_descriptor *desc);
+Instruction *init_insn(struct qemu_plugin_insn *insn);
 
 #endif

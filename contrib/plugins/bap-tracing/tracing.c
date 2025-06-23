@@ -12,10 +12,14 @@ static void log_insn_mem_access(unsigned int vcpu_index,
                                 void *userdata) {}
 
 static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
+  Instruction *insn = udata;
   g_rw_lock_reader_lock(&state.vcpus_array_lock);
-  // VCPU *c = &g_array_index(state.vcpus, VCPU, vcpu_index);
-
   g_rw_lock_writer_lock(&state.frame_buffer_lock);
+
+  VCPU *vcpu = &g_array_index(state.vcpus, VCPU, vcpu_index);
+  GArray *current_regs = qemu_plugin_get_registers();
+  g_assert(current_regs->len == vcpu->registers->len);
+
   // Add change to previous frame
   // Finish previous frame
   // Check if buffer should be dumped to file.
@@ -26,20 +30,19 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   return;
 }
 
-static Register *init_vcpu_register(qemu_plugin_reg_descriptor *desc)
-{
-    Register *reg = g_new0(Register, 1);
-    g_autofree gchar *lower = g_utf8_strdown(desc->name, -1);
-    int r;
+Register *init_vcpu_register(qemu_plugin_reg_descriptor *desc) {
+  Register *reg = g_new0(Register, 1);
+  g_autofree gchar *lower = g_utf8_strdown(desc->name, -1);
+  int r;
 
-    reg->handle = desc->handle;
-    reg->name = g_intern_string(lower);
-    reg->content = g_byte_array_new();
+  reg->handle = desc->handle;
+  reg->name = g_intern_string(lower);
+  reg->content = g_byte_array_new();
 
-    /* read the initial value */
-    r = qemu_plugin_read_register(reg->handle, reg->content);
-    g_assert(r > 0);
-    return reg;
+  /* read the initial value */
+  r = qemu_plugin_read_register(reg->handle, reg->content);
+  g_assert(r > 0);
+  return reg;
 }
 
 static GPtrArray *registers_init(int vcpu_index) {
@@ -61,7 +64,7 @@ static GPtrArray *registers_init(int vcpu_index) {
 
 static void vcpu_init(qemu_plugin_id_t id, unsigned int vcpu_index) {
   g_rw_lock_writer_lock(&state.vcpus_array_lock);
-  VCPU *vcpu = calloc(sizeof(VCPU), 1);
+  VCPU *vcpu = g_malloc0(sizeof(VCPU));
   vcpu->registers = registers_init(vcpu_index);
   g_array_insert_vals(state.vcpus, vcpu_index, &vcpu, 1);
   g_rw_lock_writer_unlock(&state.vcpus_array_lock);
@@ -71,15 +74,24 @@ static void plugin_exit(qemu_plugin_id_t id, void *udata) {
   // Dump rest of frames to file.
 }
 
+Instruction *init_insn(struct qemu_plugin_insn *tb_insn) {
+  Instruction *insn = g_malloc0(sizeof(Instruction));
+  qemu_plugin_insn_data(tb_insn, &insn->bytes, sizeof(insn->bytes));
+  insn->size = qemu_plugin_insn_size(tb_insn);
+  insn->vaddr = qemu_plugin_insn_vaddr(tb_insn);
+  return insn;
+}
+
 static void cb_trans(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
   // Add a callback for each instruction in every translated block.
-  struct qemu_plugin_insn *insn;
+  struct qemu_plugin_insn *tb_insn;
   size_t n_insns = qemu_plugin_tb_n_insns(tb);
   for (size_t i = 0; i < n_insns; i++) {
-    insn = qemu_plugin_tb_get_insn(tb, i);
-    qemu_plugin_register_vcpu_insn_exec_cb(insn, log_insn_reg_access,
-                                           QEMU_PLUGIN_CB_R_REGS, NULL);
-    qemu_plugin_register_vcpu_mem_cb(insn, log_insn_mem_access,
+    tb_insn = qemu_plugin_tb_get_insn(tb, i);
+    Instruction *insn_data = init_insn(tb_insn);
+    qemu_plugin_register_vcpu_insn_exec_cb(tb_insn, log_insn_reg_access,
+                                           QEMU_PLUGIN_CB_R_REGS, insn_data);
+    qemu_plugin_register_vcpu_mem_cb(tb_insn, log_insn_mem_access,
                                      QEMU_PLUGIN_CB_R_REGS, QEMU_PLUGIN_MEM_R,
                                      NULL);
   }
