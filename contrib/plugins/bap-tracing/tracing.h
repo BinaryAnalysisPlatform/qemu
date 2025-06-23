@@ -4,11 +4,18 @@
 #include <qemu-plugin.h>
 #include <stdio.h>
 
+#include "frame.piqi.pb-c-patched.h"
+#include "glib.h"
 #include "tracewrap.h"
 
 QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
 
 #define FRAME_BUFFER_SIZE_DEFAULT 1024
+
+typedef enum {
+  OperandRead = 1,
+  OperandWritten = 2,
+} OperandAccess;
 
 /**
  * \brief VLIW architecture have instructions longer than 4 or 8bytes.
@@ -41,7 +48,7 @@ typedef struct {
   GArray /*<VCPU>*/ *vcpus;
 
   GRWLock frame_buffer_lock;
-  FrameBuffer *frame_buffer;
+  GPtrArray /*<FrameBuffer>*/ *frame_buffer; ///< Indexed by vcpu id
 
   GRWLock file_lock;
   FILE *file;
@@ -62,19 +69,25 @@ FrameBuffer *frame_buffer_init(size_t size);
 bool frame_buffer_push(FrameBuffer *buf, Frame *frame);
 
 /**
- * \brief Flusehs the buffer and returns it's content.
+ * \brief Flushs the buffer and returns it's content.
  * The size of the returned buffer is written to \p fbuf_size.
  */
 Frame **frame_buffer_flush(FrameBuffer *buf, size_t *fbuf_size);
+
+void frame_buffer_new_frame(FrameBuffer *buf);
+void frame_buffer_append_op_info(FrameBuffer *buf, OperandInfo *oi);
 
 /**
  * \brief Create new std frame
  */
 Frame *frame_new_std(uint64_t addr, int vcpu_id);
 
-void frame_add_operand(Frame *frame, OperandInfo *oi, bool is_out);
+void frame_add_operand(Frame *frame, OperandInfo *oi);
 
 Register *init_vcpu_register(qemu_plugin_reg_descriptor *desc);
 Instruction *init_insn(struct qemu_plugin_insn *insn);
+
+OperandInfo *init_reg_operand_info(const char *name, const uint8_t *value,
+                                   size_t value_size, OperandAccess access);
 
 #endif

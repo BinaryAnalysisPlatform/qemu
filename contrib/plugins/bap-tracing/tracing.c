@@ -11,20 +11,43 @@ static void log_insn_mem_access(unsigned int vcpu_index,
                                 qemu_plugin_meminfo_t info, uint64_t vaddr,
                                 void *userdata) {}
 
+static void add_post_state_regs(VCPU *vcpu, unsigned int vcpu_index, GArray *current_regs) {
+  GByteArray *rtmp = g_byte_array_new();
+  for (size_t i = 0; i < current_regs->len; ++i) {
+    Register *prev_reg = vcpu->registers->pdata[i];
+
+    qemu_plugin_reg_descriptor *reg =
+        &g_array_index(current_regs, qemu_plugin_reg_descriptor, i);
+    int s = qemu_plugin_read_register(reg->handle, rtmp);
+    assert(s == prev_reg->content->len);
+    if (!memcmp(rtmp->data, prev_reg->content->data, s)) {
+      // No change
+      continue;
+    }
+
+    OperandInfo *rinfo = init_reg_operand_info(prev_reg->name, rtmp->data,
+                                               rtmp->len, OperandRead);
+    g_assert(rinfo);
+
+    g_rw_lock_writer_lock(&state.frame_buffer_lock);
+    FrameBuffer *fb = g_ptr_array_index(state.frame_buffer, vcpu_index);
+    frame_buffer_append_op_info(fb, rinfo);
+    g_rw_lock_writer_unlock(&state.frame_buffer_lock);
+  }
+}
+
 static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
-  Instruction *insn = udata;
   g_rw_lock_reader_lock(&state.vcpus_array_lock);
-  g_rw_lock_writer_lock(&state.frame_buffer_lock);
 
   VCPU *vcpu = &g_array_index(state.vcpus, VCPU, vcpu_index);
   GArray *current_regs = qemu_plugin_get_registers();
   g_assert(current_regs->len == vcpu->registers->len);
 
-  // Add change to previous frame
-  // Finish previous frame
+  add_post_state_regs(vcpu, vcpu_index, current_regs);
   // Check if buffer should be dumped to file.
+
   // Open new one.
-  g_rw_lock_writer_unlock(&state.frame_buffer_lock);
+  Instruction *insn = udata;
   g_rw_lock_reader_unlock(&state.vcpus_array_lock);
 
   return;
@@ -64,14 +87,42 @@ static GPtrArray *registers_init(int vcpu_index) {
 
 static void vcpu_init(qemu_plugin_id_t id, unsigned int vcpu_index) {
   g_rw_lock_writer_lock(&state.vcpus_array_lock);
+  g_rw_lock_writer_lock(&state.frame_buffer_lock);
+
   VCPU *vcpu = g_malloc0(sizeof(VCPU));
   vcpu->registers = registers_init(vcpu_index);
   g_array_insert_vals(state.vcpus, vcpu_index, &vcpu, 1);
+  FrameBuffer *vcpu_frame_buffer = frame_buffer_init(FRAME_BUFFER_SIZE_DEFAULT);
+  g_ptr_array_insert(state.frame_buffer, vcpu_index, &vcpu_frame_buffer);
+
+  g_rw_lock_writer_unlock(&state.frame_buffer_lock);
   g_rw_lock_writer_unlock(&state.vcpus_array_lock);
 }
 
-static void plugin_exit(qemu_plugin_id_t id, void *udata) {
-  // Dump rest of frames to file.
+OperandInfo *init_reg_operand_info(const char *name, const uint8_t *value,
+                                   size_t value_size, OperandAccess access) {
+  RegOperand *ro = g_new(RegOperand, 1);
+  reg_operand__init(ro);
+  ro->name = strdup(name);
+
+  OperandInfoSpecific *ois = g_new(OperandInfoSpecific, 1);
+  operand_info_specific__init(ois);
+  ois->reg_operand = ro;
+
+  OperandUsage *ou = g_new(OperandUsage, 1);
+  operand_usage__init(ou);
+  ou->read = access & OperandRead;
+  ou->written = access & OperandWritten;
+  OperandInfo *oi = g_new(OperandInfo, 1);
+  operand_info__init(oi);
+  oi->bit_length = 0;
+  oi->operand_info_specific = ois;
+  oi->operand_usage = ou;
+  oi->value.len = value_size;
+  oi->value.data = g_malloc(oi->value.len);
+  memcpy(oi->value.data, value, value_size);
+
+  return oi;
 }
 
 Instruction *init_insn(struct qemu_plugin_insn *tb_insn) {
@@ -97,11 +148,15 @@ static void cb_trans(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
   }
 }
 
+static void plugin_exit(qemu_plugin_id_t id, void *udata) {
+  // Dump rest of frames to file.
+}
+
 QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
                                            const qemu_info_t *info, int argc,
                                            char **argv) {
   const char *target_path = "/tmp/test.trace";
-  state.frame_buffer = frame_buffer_init(FRAME_BUFFER_SIZE_DEFAULT);
+  state.frame_buffer = g_ptr_array_new();
   state.vcpus = g_array_new(false, true, sizeof(VCPU));
   state.file = fopen(target_path, "r");
   if (!(state.frame_buffer || state.vcpus || state.file)) {

@@ -23,9 +23,9 @@ Frame *frame_new_std(uint64_t addr, int vcpu_id) {
   return frame;
 }
 
-void frame_add_operand(Frame *frame, OperandInfo *oi, bool is_post) {
+void frame_add_operand(Frame *frame, OperandInfo *oi) {
     OperandValueList *ol;
-    if (is_post) {
+    if (oi->operand_usage->written) {
         ol = frame->std_frame->operand_post_list;
     } else {
         ol = frame->std_frame->operand_pre_list;
