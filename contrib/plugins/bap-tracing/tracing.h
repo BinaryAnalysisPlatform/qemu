@@ -16,12 +16,18 @@ typedef struct {
 } FrameBuffer;
 
 typedef struct {
-  // Current instruction related things.
+    struct qemu_plugin_register *handle; ///< Passed to qemu API.
+    GByteArray *content;
+    const char *name;
+} Register;
+
+typedef struct {
+  GPtrArray /*<Register>*/ *registers;
 } VCPU;
 
 typedef struct {
   GRWLock vcpus_array_lock;
-  GArray *vcpus;
+  GArray /*<VCPU>*/ *vcpus;
 
   GRWLock frame_buffer_lock;
   FrameBuffer *frame_buffer;
