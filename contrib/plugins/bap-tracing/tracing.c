@@ -1,21 +1,9 @@
 // SPDX-FileCopyrightText: 2025 Rot127 <unisono@quyllur.org>
 // SPDX-License-Identifier: GPL-2.0-only
 
-#include <qemu-plugin.h>
+#include <glib.h>
 
-QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
-
-typedef struct {
-  // Current instruction related things.
-} VCPU;
-
-typedef struct {
-  GRWLock vcpus_array_lock;
-  GArray *vcpus;
-
-  GRWLock frame_buffer_lock;
-  GPtrArray *frame_buffer;
-} TraceState;
+#include "tracing.h"
 
 static TraceState state;
 
