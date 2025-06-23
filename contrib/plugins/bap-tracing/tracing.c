@@ -7,6 +7,10 @@
 
 static TraceState state;
 
+static void log_insn_mem_access(unsigned int vcpu_index,
+                                qemu_plugin_meminfo_t info, uint64_t vaddr,
+                                void *userdata) {}
+
 static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   g_rw_lock_reader_lock(&state.vcpus_array_lock);
   // VCPU *c = &g_array_index(state.vcpus, VCPU, vcpu_index);
@@ -75,6 +79,9 @@ static void cb_trans(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
     insn = qemu_plugin_tb_get_insn(tb, i);
     qemu_plugin_register_vcpu_insn_exec_cb(insn, log_insn_reg_access,
                                            QEMU_PLUGIN_CB_R_REGS, NULL);
+    qemu_plugin_register_vcpu_mem_cb(insn, log_insn_mem_access,
+                                     QEMU_PLUGIN_CB_R_REGS, QEMU_PLUGIN_MEM_R,
+                                     NULL);
   }
 }
 
