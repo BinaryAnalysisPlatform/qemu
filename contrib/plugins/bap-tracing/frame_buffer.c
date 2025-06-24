@@ -2,18 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 #include "frame_buffer.h"
-
-#define WRITE(x)                                                               \
-  do {                                                                         \
-    if (fwrite(&(x), sizeof(x), 1, file) != 1)                                 \
-      qemu_plugin_outs("fwrite failed");                                       \
-  } while (0)
-
-#define WRITE_BUF(x, n)                                                        \
-  do {                                                                         \
-    if (fwrite((x), 1, (n), file) != n)                                        \
-      qemu_plugin_outs("fwrite failed");                                       \
-  } while (0)
+#include "trace_meta.h"
 
 static Frame *frame_new_std(uint64_t addr, int vcpu_id) {
   Frame *frame = g_new(Frame, 1);
@@ -39,22 +28,22 @@ static Frame *frame_new_std(uint64_t addr, int vcpu_id) {
 }
 
 static inline void free_operand(OperandInfo *oi) {
-    OperandInfoSpecific *ois = oi->operand_info_specific;
+  OperandInfoSpecific *ois = oi->operand_info_specific;
 
-    //Free reg-operand
-    RegOperand *ro = ois->reg_operand;
-    if (ro && ro->name)
-        g_free(ro->name);
-    g_free(ro);
+  // Free reg-operand
+  RegOperand *ro = ois->reg_operand;
+  if (ro && ro->name)
+    g_free(ro->name);
+  g_free(ro);
 
-    //Free mem-operand
-    MemOperand *mo = ois->mem_operand;
-    g_free(mo);
-    g_free(oi->value.data);
-    g_free(oi->taint_info);
-    g_free(ois);
-    g_free(oi->operand_usage);
-    g_free(oi);
+  // Free mem-operand
+  MemOperand *mo = ois->mem_operand;
+  g_free(mo);
+  g_free(oi->value.data);
+  g_free(oi->taint_info);
+  g_free(ois);
+  g_free(oi->operand_usage);
+  g_free(oi);
 }
 
 static void frame_free(Frame *frame) {
@@ -79,17 +68,12 @@ static void frame_free(Frame *frame) {
   g_free(frame);
 }
 
-static bool frame_add_operand(Frame *frame, OperandInfo *oi) {
-  if (!frame->std_frame) {
-    qemu_plugin_outs(
-        "Append operand info to non-std frames is not implemented.");
-    return false;
-  }
+static bool std_frame_add_operand(StdFrame *std_frame, OperandInfo *oi) {
   OperandValueList *ol;
   if (oi->operand_usage->written) {
-    ol = frame->std_frame->operand_post_list;
+    ol = std_frame->operand_post_list;
   } else {
-    ol = frame->std_frame->operand_pre_list;
+    ol = std_frame->operand_pre_list;
   }
 
   oi->taint_info = g_new(TaintInfo, 1);
@@ -170,12 +154,12 @@ bool frame_buffer_append_reg_info(FrameBuffer *buf, const char *name,
       frame_init_reg_operand_info(name, content->data, content->len, acc);
   g_assert(oi);
   Frame *frame = buf->fbuf[buf->idx];
-  if (!frame) {
+  if (!frame || !frame->std_frame) {
     qemu_plugin_outs(
         "Attempt to append operand info to a uninitialzied frame.");
     return false;
   }
-  return frame_add_operand(frame, oi);
+  return std_frame_add_operand(frame->std_frame, oi);
 }
 
 OperandInfo *frame_init_reg_operand_info(const char *name, const uint8_t *value,

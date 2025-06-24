@@ -8,13 +8,8 @@
 #include <qemu-plugin.h>
 #include <stdio.h>
 
+#include "trace_meta.h"
 #include "frame.piqi.pb-c-patched.h"
-
-/**
- * \brief Empty macros indicate the argument, variable etc.
- * must be locked for writing.
- */
-#define WLOCKED
 
 typedef enum {
   OperandRead = 1,

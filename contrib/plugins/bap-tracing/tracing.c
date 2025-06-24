@@ -156,10 +156,12 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
   const char *target_path = "/tmp/test.trace";
   state.frame_buffer = g_ptr_array_new();
   state.vcpus = g_array_new(false, true, sizeof(VCPU));
-  state.file = fopen(target_path, "r");
+  state.file = fopen(target_path, "wb");
   if (!(state.frame_buffer || state.vcpus || state.file)) {
     return 1;
   }
+  // write_header();
+  // write_meta(argv, envp, target_argv, target_envp);
 
   qemu_plugin_register_vcpu_init_cb(id, vcpu_init);
   qemu_plugin_register_vcpu_tb_trans_cb(id, cb_trans);
