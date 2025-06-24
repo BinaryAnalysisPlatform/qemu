@@ -11,7 +11,8 @@ static void log_insn_mem_access(unsigned int vcpu_index,
                                 qemu_plugin_meminfo_t info, uint64_t vaddr,
                                 void *userdata) {}
 
-static void add_post_state_regs(VCPU *vcpu, unsigned int vcpu_index, GArray *current_regs) {
+static void add_post_reg_state(VCPU *vcpu, unsigned int vcpu_index,
+                               GArray *current_regs, FrameBuffer *fbuf) {
   GByteArray *rtmp = g_byte_array_new();
   for (size_t i = 0; i < current_regs->len; ++i) {
     Register *prev_reg = vcpu->registers->pdata[i];
@@ -26,36 +27,75 @@ static void add_post_state_regs(VCPU *vcpu, unsigned int vcpu_index, GArray *cur
     }
 
     OperandInfo *rinfo = init_reg_operand_info(prev_reg->name, rtmp->data,
+                                               rtmp->len, OperandWritten);
+    g_assert(rinfo);
+    frame_buffer_append_op_info(fbuf, rinfo);
+  }
+}
+
+static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
+                              GArray *current_regs, FrameBuffer *fbuf) {
+  GByteArray *rtmp = g_byte_array_new();
+  for (size_t i = 0; i < current_regs->len; ++i) {
+    qemu_plugin_reg_descriptor *reg =
+        &g_array_index(current_regs, qemu_plugin_reg_descriptor, i);
+    qemu_plugin_read_register(reg->handle, rtmp);
+    OperandInfo *rinfo = init_reg_operand_info(reg->name, rtmp->data,
                                                rtmp->len, OperandRead);
     g_assert(rinfo);
-
-    g_rw_lock_writer_lock(&state.frame_buffer_lock);
-    FrameBuffer *fb = g_ptr_array_index(state.frame_buffer, vcpu_index);
-    frame_buffer_append_op_info(fb, rinfo);
-    g_rw_lock_writer_unlock(&state.frame_buffer_lock);
+    frame_buffer_append_op_info(fbuf, rinfo);
   }
+}
+
+static void add_new_insn_frame(VCPU *vcpu, unsigned int vcpu_index,
+                               FrameBuffer *fbuf, Instruction *insn) {
+  Frame *frame = frame_buffer_new_frame(fbuf);
+  frame__init(frame);
+
+  StdFrame *sframe = g_new(StdFrame, 1);
+  std_frame__init(sframe);
+  frame->std_frame = sframe;
+
+  sframe->thread_id = vcpu_index;
+  sframe->address = insn->vaddr;
+  sframe->rawbytes.len = insn->size;
+  sframe->rawbytes.data = g_malloc(insn->size);
+  memcpy(sframe->rawbytes.data, insn->bytes, insn->size);
+
+  OperandValueList *ol_in = g_new(OperandValueList, 1);
+  operand_value_list__init(ol_in);
+  ol_in->n_elem = 0;
+  sframe->operand_pre_list = ol_in;
+
+  OperandValueList *ol_out = g_new(OperandValueList, 1);
+  operand_value_list__init(ol_out);
+  ol_out->n_elem = 0;
+  sframe->operand_post_list = ol_out;
 }
 
 static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   g_rw_lock_reader_lock(&state.vcpus_array_lock);
+  g_rw_lock_writer_lock(&state.frame_buffer_lock);
+  g_rw_lock_writer_lock(&state.file_lock);
 
+  FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, vcpu_index);
   VCPU *vcpu = &g_array_index(state.vcpus, VCPU, vcpu_index);
   GArray *current_regs = qemu_plugin_get_registers();
   g_assert(current_regs->len == vcpu->registers->len);
 
-  add_post_state_regs(vcpu, vcpu_index, current_regs);
+  add_post_reg_state(vcpu, vcpu_index, current_regs, fbuf);
 
-  g_rw_lock_writer_lock(&state.frame_buffer_lock);
-  g_rw_lock_writer_lock(&state.file_lock);
-  FrameBuffer *vcpu_buf = g_ptr_array_index(state.frame_buffer, vcpu_index);
-  if (frame_buffer_is_full(vcpu_buf)) {
-    frame_buffer_flush_to_file(vcpu_buf, state.file);
+  if (frame_buffer_is_full(fbuf)) {
+    frame_buffer_flush_to_file(fbuf, state.file);
   }
-  g_rw_lock_writer_unlock(&state.file_lock);
-  g_rw_lock_writer_unlock(&state.frame_buffer_lock);
 
   // Open new one.
   Instruction *insn = udata;
+  add_new_insn_frame(vcpu, vcpu_index, fbuf, insn);
+  add_pre_reg_state(vcpu, vcpu_index, current_regs, fbuf);
+
+  g_rw_lock_writer_unlock(&state.file_lock);
+  g_rw_lock_writer_unlock(&state.frame_buffer_lock);
   g_rw_lock_reader_unlock(&state.vcpus_array_lock);
 
   return;
