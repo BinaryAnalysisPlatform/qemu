@@ -25,6 +25,7 @@ typedef struct {
   Frame **fbuf;    ///< The frames buffered.
   size_t idx;      ///< Points to currently open frame.
   size_t max_size; ///< Maximum number of elements fbuf can hold.
+  size_t frames_written; ///< Number of frames written from buffer to file.
 } FrameBuffer;
 
 /**
@@ -33,17 +34,17 @@ typedef struct {
  */
 FrameBuffer *frame_buffer_new(size_t size);
 
-void frame_buffer_flush_to_file(WLOCKED FrameBuffer *buf, WLOCKED FILE *file);
+void frame_buffer_flush_to_file(FrameBuffer *buf, WLOCKED FILE *file);
 bool frame_buffer_is_full(const FrameBuffer *buf);
 
-bool frame_buffer_new_frame_std(WLOCKED FrameBuffer *buf,
+bool frame_buffer_new_frame_std(FrameBuffer *buf,
                                 unsigned int thread_id, uint64_t vaddr,
                                 uint8_t *bytes, size_t bytes_len);
 
 /**
  * \brief Appends the given operand info to the open frame.
  */
-bool frame_buffer_append_reg_info(WLOCKED FrameBuffer *buf, const char *name,
+bool frame_buffer_append_reg_info(FrameBuffer *buf, const char *name,
                                   const GByteArray *content,
                                   OperandAccess acc);
 

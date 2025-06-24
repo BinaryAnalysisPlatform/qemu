@@ -3,6 +3,18 @@
 
 #include "frame_buffer.h"
 
+#define WRITE(x)                                                               \
+  do {                                                                         \
+    if (fwrite(&(x), sizeof(x), 1, file) != 1)                                 \
+      qemu_plugin_outs("fwrite failed");                                       \
+  } while (0)
+
+#define WRITE_BUF(x, n)                                                        \
+  do {                                                                         \
+    if (fwrite((x), 1, (n), file) != n)                                        \
+      qemu_plugin_outs("fwrite failed");                                       \
+  } while (0)
+
 static Frame *frame_new_std(uint64_t addr, int vcpu_id) {
   Frame *frame = g_new(Frame, 1);
   frame__init(frame);
@@ -24,6 +36,47 @@ static Frame *frame_new_std(uint64_t addr, int vcpu_id) {
   ol_out->n_elem = 0;
   sframe->operand_post_list = ol_out;
   return frame;
+}
+
+static inline void free_operand(OperandInfo *oi) {
+    OperandInfoSpecific *ois = oi->operand_info_specific;
+
+    //Free reg-operand
+    RegOperand *ro = ois->reg_operand;
+    if (ro && ro->name)
+        g_free(ro->name);
+    g_free(ro);
+
+    //Free mem-operand
+    MemOperand *mo = ois->mem_operand;
+    g_free(mo);
+    g_free(oi->value.data);
+    g_free(oi->taint_info);
+    g_free(ois);
+    g_free(oi->operand_usage);
+    g_free(oi);
+}
+
+static void frame_free(Frame *frame) {
+  if (!frame) {
+    return;
+  }
+  StdFrame *sframe = frame->std_frame;
+  for (size_t i = 0; i < sframe->operand_pre_list->n_elem; i++) {
+    free_operand(sframe->operand_pre_list->elem[i]);
+  }
+  g_free(sframe->operand_pre_list->elem);
+  g_free(sframe->operand_pre_list);
+
+  for (size_t i = 0; i < sframe->operand_post_list->n_elem; i++) {
+    free_operand(sframe->operand_post_list->elem[i]);
+  }
+  g_free(sframe->operand_post_list->elem);
+  g_free(sframe->operand_post_list);
+
+  g_free(sframe->rawbytes.data);
+  g_free(sframe);
+  g_free(frame);
 }
 
 static bool frame_add_operand(Frame *frame, OperandInfo *oi) {
@@ -61,11 +114,25 @@ bool frame_buffer_is_full(const FrameBuffer *buf) {
   return buf->idx >= buf->max_size;
 }
 
-void frame_buffer_flush_to_file(WLOCKED FrameBuffer *buf, WLOCKED FILE *file);
+void frame_buffer_flush_to_file(FrameBuffer *buf, WLOCKED FILE *file) {
+  for (size_t i = 0; i <= buf->idx && i < buf->max_size; ++i) {
+    Frame *frame = buf->fbuf[i];
+    size_t msg_size = frame__get_packed_size(frame);
+    uint8_t *packed_buffer = g_alloca(msg_size);
+    uint64_t packed_size = frame__pack(frame, packed_buffer);
+    WRITE(packed_size);
+    WRITE_BUF(packed_buffer, packed_size);
+    buf->frames_written++;
+    frame_free(frame);
+  }
+  memset(buf->fbuf, 0, sizeof(Frame *) * buf->max_size);
+  buf->idx = 0;
+  // toc_update(); ??
+}
 
-bool frame_buffer_new_frame_std(WLOCKED FrameBuffer *buf,
-                                unsigned int thread_id, uint64_t vaddr,
-                                uint8_t *bytes, size_t bytes_len) {
+bool frame_buffer_new_frame_std(FrameBuffer *buf, unsigned int thread_id,
+                                uint64_t vaddr, uint8_t *bytes,
+                                size_t bytes_len) {
   if (frame_buffer_is_full(buf)) {
     return false;
   }
@@ -96,7 +163,7 @@ bool frame_buffer_new_frame_std(WLOCKED FrameBuffer *buf,
   return true;
 }
 
-bool frame_buffer_append_reg_info(WLOCKED FrameBuffer *buf, const char *name,
+bool frame_buffer_append_reg_info(FrameBuffer *buf, const char *name,
                                   const GByteArray *content,
                                   OperandAccess acc) {
   OperandInfo *rinfo =

@@ -75,8 +75,6 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
 
   g_rw_lock_reader_unlock(&state.frame_buffer_lock);
   g_rw_lock_reader_unlock(&state.vcpus_array_lock);
-
-  return;
 }
 
 Register *init_vcpu_register(qemu_plugin_reg_descriptor *desc) {
