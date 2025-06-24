@@ -11,7 +11,7 @@ piqi_src = custom_target('piqi',
   command: [piqi, 'to-proto', '@INPUT@', '-o', '@OUTPUT@'])
 
 # protobuf file -> C code
-proto_src_raw = custom_target('proto',
+frame_proto_src_raw = custom_target('proto',
   input: piqi_src,
   output: ['frame.piqi.pb-c.c', 'frame.piqi.pb-c.h'],
   command: [protoc_c, '--c_out=.', '@INPUT@'],
@@ -20,17 +20,19 @@ proto_src_raw = custom_target('proto',
 # Patch protobuf header: base -> __base.
 # Necessary for the C build.
 # See fix_proto_src.py
-proto_src = custom_target(
-  input: proto_src_raw,
+frame_proto_src = custom_target(
+  input: frame_proto_src_raw,
   output: ['frame.piqi.pb-c-patched.c', 'frame.piqi.pb-c-patched.h'],
   command: [files('fix_proto_src.py'), '@INPUT@', '-o', '@OUTPUT@'],
-  depends: proto_src_raw
+  depends: frame_proto_src_raw
 )
 
-libprotobuf = static_library('protobuf', [proto_src], pic: true)
+libprotobuf = dependency('libprotobuf-c')
+frame_protobuf = static_library('protobuf', [frame_proto_src], pic: true)
 dep_libprotobuf = declare_dependency(
-    sources : proto_src,
-    link_with : [libprotobuf],
+    sources : frame_proto_src,
+    link_with : [frame_protobuf],
+    dependencies: [libprotobuf]
 )
 
 bap_tracing_src = files(
