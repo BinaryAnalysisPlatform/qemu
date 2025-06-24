@@ -16,11 +16,6 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
 
 #define FRAME_BUFFER_SIZE_DEFAULT 1024
 
-typedef enum {
-  OperandRead = 1,
-  OperandWritten = 2,
-} OperandAccess;
-
 /**
  * \brief VLIW architecture have instructions longer than 4 or 8bytes.
  */
@@ -56,8 +51,5 @@ typedef struct {
 VCPU *vcpu_new(void);
 Register *init_vcpu_register(qemu_plugin_reg_descriptor *desc);
 Instruction *init_insn(struct qemu_plugin_insn *insn);
-
-OperandInfo *init_reg_operand_info(const char *name, const uint8_t *value,
-                                   size_t value_size, OperandAccess access);
 
 #endif

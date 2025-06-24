@@ -3,6 +3,7 @@
 
 #include <glib.h>
 
+#include "frame_buffer.h"
 #include "tracing.h"
 
 static TraceState state;
@@ -26,10 +27,13 @@ static void add_post_reg_state(VCPU *vcpu, unsigned int vcpu_index,
       continue;
     }
 
-    OperandInfo *rinfo = init_reg_operand_info(prev_reg->name, rtmp->data,
+    OperandInfo *rinfo = frame_init_reg_operand_info(prev_reg->name, rtmp->data,
                                                rtmp->len, OperandWritten);
     g_assert(rinfo);
-    frame_buffer_append_op_info(fbuf, rinfo);
+    if (!frame_buffer_append_op_info(fbuf, rinfo)) {
+      qemu_plugin_outs("Failed to append opinfo.\n");
+      g_assert(false);
+    }
   }
 }
 
@@ -41,7 +45,7 @@ static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
         &g_array_index(current_regs, qemu_plugin_reg_descriptor, i);
     qemu_plugin_read_register(reg->handle, rtmp);
     OperandInfo *rinfo =
-        init_reg_operand_info(reg->name, rtmp->data, rtmp->len, OperandRead);
+        frame_init_reg_operand_info(reg->name, rtmp->data, rtmp->len, OperandRead);
     g_assert(rinfo);
     frame_buffer_append_op_info(fbuf, rinfo);
   }
@@ -49,23 +53,8 @@ static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
 
 static void add_new_insn_frame(VCPU *vcpu, unsigned int vcpu_index,
                                FrameBuffer *fbuf, Instruction *insn) {
-  StdFrame *stdframe = frame_buffer_new_frame_std(fbuf);
-
-  stdframe->thread_id = vcpu_index;
-  stdframe->address = insn->vaddr;
-  stdframe->rawbytes.len = insn->size;
-  stdframe->rawbytes.data = g_malloc(insn->size);
-  memcpy(stdframe->rawbytes.data, insn->bytes, insn->size);
-
-  OperandValueList *ol_in = g_new(OperandValueList, 1);
-  operand_value_list__init(ol_in);
-  ol_in->n_elem = 0;
-  stdframe->operand_pre_list = ol_in;
-
-  OperandValueList *ol_out = g_new(OperandValueList, 1);
-  operand_value_list__init(ol_out);
-  ol_out->n_elem = 0;
-  stdframe->operand_post_list = ol_out;
+  frame_buffer_new_frame_std(fbuf, vcpu_index, insn->vaddr, insn->bytes,
+                             insn->size);
 }
 
 static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
@@ -140,32 +129,6 @@ static void vcpu_init(qemu_plugin_id_t id, unsigned int vcpu_index) {
 
   g_rw_lock_writer_unlock(&state.frame_buffer_lock);
   g_rw_lock_writer_unlock(&state.vcpus_array_lock);
-}
-
-OperandInfo *init_reg_operand_info(const char *name, const uint8_t *value,
-                                   size_t value_size, OperandAccess access) {
-  RegOperand *ro = g_new(RegOperand, 1);
-  reg_operand__init(ro);
-  ro->name = strdup(name);
-
-  OperandInfoSpecific *ois = g_new(OperandInfoSpecific, 1);
-  operand_info_specific__init(ois);
-  ois->reg_operand = ro;
-
-  OperandUsage *ou = g_new(OperandUsage, 1);
-  operand_usage__init(ou);
-  ou->read = access & OperandRead;
-  ou->written = access & OperandWritten;
-  OperandInfo *oi = g_new(OperandInfo, 1);
-  operand_info__init(oi);
-  oi->bit_length = value_size * 8;
-  oi->operand_info_specific = ois;
-  oi->operand_usage = ou;
-  oi->value.len = value_size;
-  oi->value.data = g_malloc(oi->value.len);
-  memcpy(oi->value.data, value, value_size);
-
-  return oi;
 }
 
 Instruction *init_insn(struct qemu_plugin_insn *tb_insn) {

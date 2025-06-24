@@ -4,15 +4,26 @@
 #ifndef BAP_FRAME_BUFFER_H
 #define BAP_FRAME_BUFFER_H
 
+#include <glib.h>
 #include <qemu-plugin.h>
 #include <stdio.h>
-#include <glib.h>
 
 #include "frame.piqi.pb-c-patched.h"
 
+/**
+ * \brief Empty macros indicate the argument, variable etc.
+ * must be locked for writing.
+ */
+#define WLOCKED
+
+typedef enum {
+  OperandRead = 1,
+  OperandWritten = 2,
+} OperandAccess;
+
 typedef struct {
-  Frame **fbuf; ///< The frames buffered.
-  size_t idx; ///< Points to currently open frame.
+  Frame **fbuf;    ///< The frames buffered.
+  size_t idx;      ///< Points to currently open frame.
   size_t max_size; ///< Maximum number of elements fbuf can hold.
 } FrameBuffer;
 
@@ -22,10 +33,20 @@ typedef struct {
  */
 FrameBuffer *frame_buffer_new(size_t size);
 
-void frame_buffer_flush_to_file(FrameBuffer *buf, FILE *file);
+void frame_buffer_flush_to_file(WLOCKED FrameBuffer *buf, WLOCKED FILE *file);
 bool frame_buffer_is_full(const FrameBuffer *buf);
 
-StdFrame *frame_buffer_new_frame_std(FrameBuffer *buf);
-void frame_buffer_append_op_info(FrameBuffer *buf, OperandInfo *oi);
+bool frame_buffer_new_frame_std(WLOCKED FrameBuffer *buf,
+                                unsigned int thread_id, uint64_t vaddr,
+                                uint8_t *bytes, size_t bytes_len);
+
+/**
+ * \brief Appends the given operand info to the open frame.
+ */
+bool frame_buffer_append_op_info(WLOCKED FrameBuffer *buf, OperandInfo *oi);
+
+OperandInfo *frame_init_reg_operand_info(const char *name, const uint8_t *value,
+                                         size_t value_size,
+                                         OperandAccess access);
 
 #endif
