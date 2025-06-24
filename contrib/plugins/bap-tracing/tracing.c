@@ -163,7 +163,7 @@ OperandInfo *init_reg_operand_info(const char *name, const uint8_t *value,
   ou->written = access & OperandWritten;
   OperandInfo *oi = g_new(OperandInfo, 1);
   operand_info__init(oi);
-  oi->bit_length = 0;
+  oi->bit_length = value_size * 8;
   oi->operand_info_specific = ois;
   oi->operand_usage = ou;
   oi->value.len = value_size;
