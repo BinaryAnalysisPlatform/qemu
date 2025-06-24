@@ -43,7 +43,9 @@ bool frame_buffer_new_frame_std(WLOCKED FrameBuffer *buf,
 /**
  * \brief Appends the given operand info to the open frame.
  */
-bool frame_buffer_append_op_info(WLOCKED FrameBuffer *buf, OperandInfo *oi);
+bool frame_buffer_append_reg_info(WLOCKED FrameBuffer *buf, const char *name,
+                                  const GByteArray *content,
+                                  OperandAccess acc);
 
 OperandInfo *frame_init_reg_operand_info(const char *name, const uint8_t *value,
                                          size_t value_size,

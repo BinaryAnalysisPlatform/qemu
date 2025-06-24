@@ -96,7 +96,12 @@ bool frame_buffer_new_frame_std(WLOCKED FrameBuffer *buf,
   return true;
 }
 
-bool frame_buffer_append_op_info(WLOCKED FrameBuffer *buf, OperandInfo *oi) {
+bool frame_buffer_append_reg_info(WLOCKED FrameBuffer *buf, const char *name,
+                                  const GByteArray *content,
+                                  OperandAccess acc) {
+  OperandInfo *rinfo =
+      frame_init_reg_operand_info(name, content->data, content->len, acc);
+  g_assert(rinfo);
   Frame *frame = buf->fbuf[buf->idx];
   if (!frame) {
     qemu_plugin_outs(
@@ -107,7 +112,8 @@ bool frame_buffer_append_op_info(WLOCKED FrameBuffer *buf, OperandInfo *oi) {
 }
 
 OperandInfo *frame_init_reg_operand_info(const char *name, const uint8_t *value,
-                                   size_t value_size, OperandAccess access) {
+                                         size_t value_size,
+                                         OperandAccess access) {
   RegOperand *ro = g_new(RegOperand, 1);
   reg_operand__init(ro);
   ro->name = strdup(name);

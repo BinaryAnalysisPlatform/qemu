@@ -14,23 +14,20 @@ static void log_insn_mem_access(unsigned int vcpu_index,
 
 static void add_post_reg_state(VCPU *vcpu, unsigned int vcpu_index,
                                GArray *current_regs, FrameBuffer *fbuf) {
-  GByteArray *rtmp = g_byte_array_new();
+  GByteArray *rdata = g_byte_array_new();
   for (size_t i = 0; i < current_regs->len; ++i) {
     Register *prev_reg = vcpu->registers->pdata[i];
 
     qemu_plugin_reg_descriptor *reg =
         &g_array_index(current_regs, qemu_plugin_reg_descriptor, i);
-    int s = qemu_plugin_read_register(reg->handle, rtmp);
+    int s = qemu_plugin_read_register(reg->handle, rdata);
     assert(s == prev_reg->content->len);
-    if (!memcmp(rtmp->data, prev_reg->content->data, s)) {
+    if (!memcmp(rdata->data, prev_reg->content->data, s)) {
       // No change
       continue;
     }
 
-    OperandInfo *rinfo = frame_init_reg_operand_info(prev_reg->name, rtmp->data,
-                                               rtmp->len, OperandWritten);
-    g_assert(rinfo);
-    if (!frame_buffer_append_op_info(fbuf, rinfo)) {
+    if (!frame_buffer_append_reg_info(fbuf, reg->name, rdata, OperandWritten)) {
       qemu_plugin_outs("Failed to append opinfo.\n");
       g_assert(false);
     }
@@ -39,15 +36,12 @@ static void add_post_reg_state(VCPU *vcpu, unsigned int vcpu_index,
 
 static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
                               GArray *current_regs, FrameBuffer *fbuf) {
-  GByteArray *rtmp = g_byte_array_new();
+  GByteArray *rdata = g_byte_array_new();
   for (size_t i = 0; i < current_regs->len; ++i) {
     qemu_plugin_reg_descriptor *reg =
         &g_array_index(current_regs, qemu_plugin_reg_descriptor, i);
-    qemu_plugin_read_register(reg->handle, rtmp);
-    OperandInfo *rinfo =
-        frame_init_reg_operand_info(reg->name, rtmp->data, rtmp->len, OperandRead);
-    g_assert(rinfo);
-    frame_buffer_append_op_info(fbuf, rinfo);
+    qemu_plugin_read_register(reg->handle, rdata);
+    frame_buffer_append_reg_info(fbuf, reg->name, rdata, OperandRead);
   }
 }
 
