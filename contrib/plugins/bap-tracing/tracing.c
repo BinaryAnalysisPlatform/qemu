@@ -44,7 +44,15 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   g_assert(current_regs->len == vcpu->registers->len);
 
   add_post_state_regs(vcpu, vcpu_index, current_regs);
-  // Check if buffer should be dumped to file.
+
+  g_rw_lock_writer_lock(&state.frame_buffer_lock);
+  g_rw_lock_writer_lock(&state.file_lock);
+  FrameBuffer *vcpu_buf = g_ptr_array_index(state.frame_buffer, vcpu_index);
+  if (frame_buffer_is_full(vcpu_buf)) {
+    frame_buffer_flush_to_file(vcpu_buf, state.file);
+  }
+  g_rw_lock_writer_unlock(&state.file_lock);
+  g_rw_lock_writer_unlock(&state.frame_buffer_lock);
 
   // Open new one.
   Instruction *insn = udata;

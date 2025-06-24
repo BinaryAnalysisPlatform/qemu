@@ -68,11 +68,8 @@ FrameBuffer *frame_buffer_init(size_t size);
  */
 bool frame_buffer_push(FrameBuffer *buf, Frame *frame);
 
-/**
- * \brief Flushs the buffer and returns it's content.
- * The size of the returned buffer is written to \p fbuf_size.
- */
-Frame **frame_buffer_flush(FrameBuffer *buf, size_t *fbuf_size);
+void frame_buffer_flush_to_file(FrameBuffer *buf, FILE *file);
+bool frame_buffer_is_full(const FrameBuffer *buf);
 
 void frame_buffer_new_frame(FrameBuffer *buf);
 void frame_buffer_append_op_info(FrameBuffer *buf, OperandInfo *oi);
