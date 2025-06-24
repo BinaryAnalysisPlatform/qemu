@@ -53,8 +53,7 @@ static void add_new_insn_frame(VCPU *vcpu, unsigned int vcpu_index,
 
 static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   g_rw_lock_reader_lock(&state.vcpus_array_lock);
-  g_rw_lock_writer_lock(&state.frame_buffer_lock);
-  g_rw_lock_writer_lock(&state.file_lock);
+  g_rw_lock_reader_lock(&state.frame_buffer_lock);
 
   FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, vcpu_index);
   VCPU *vcpu = &g_array_index(state.vcpus, VCPU, vcpu_index);
@@ -64,7 +63,9 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   add_post_reg_state(vcpu, vcpu_index, current_regs, fbuf);
 
   if (frame_buffer_is_full(fbuf)) {
+    g_rw_lock_writer_lock(&state.file_lock);
     frame_buffer_flush_to_file(fbuf, state.file);
+    g_rw_lock_writer_unlock(&state.file_lock);
   }
 
   // Open new one.
@@ -72,8 +73,7 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   add_new_insn_frame(vcpu, vcpu_index, fbuf, insn);
   add_pre_reg_state(vcpu, vcpu_index, current_regs, fbuf);
 
-  g_rw_lock_writer_unlock(&state.file_lock);
-  g_rw_lock_writer_unlock(&state.frame_buffer_lock);
+  g_rw_lock_reader_unlock(&state.frame_buffer_lock);
   g_rw_lock_reader_unlock(&state.vcpus_array_lock);
 
   return;
