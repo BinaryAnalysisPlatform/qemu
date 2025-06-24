@@ -49,28 +49,23 @@ static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
 
 static void add_new_insn_frame(VCPU *vcpu, unsigned int vcpu_index,
                                FrameBuffer *fbuf, Instruction *insn) {
-  Frame *frame = frame_buffer_new_frame(fbuf);
-  frame__init(frame);
+  StdFrame *stdframe = frame_buffer_new_frame_std(fbuf);
 
-  StdFrame *sframe = g_new(StdFrame, 1);
-  std_frame__init(sframe);
-  frame->std_frame = sframe;
-
-  sframe->thread_id = vcpu_index;
-  sframe->address = insn->vaddr;
-  sframe->rawbytes.len = insn->size;
-  sframe->rawbytes.data = g_malloc(insn->size);
-  memcpy(sframe->rawbytes.data, insn->bytes, insn->size);
+  stdframe->thread_id = vcpu_index;
+  stdframe->address = insn->vaddr;
+  stdframe->rawbytes.len = insn->size;
+  stdframe->rawbytes.data = g_malloc(insn->size);
+  memcpy(stdframe->rawbytes.data, insn->bytes, insn->size);
 
   OperandValueList *ol_in = g_new(OperandValueList, 1);
   operand_value_list__init(ol_in);
   ol_in->n_elem = 0;
-  sframe->operand_pre_list = ol_in;
+  stdframe->operand_pre_list = ol_in;
 
   OperandValueList *ol_out = g_new(OperandValueList, 1);
   operand_value_list__init(ol_out);
   ol_out->n_elem = 0;
-  sframe->operand_post_list = ol_out;
+  stdframe->operand_post_list = ol_out;
 }
 
 static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
@@ -140,7 +135,7 @@ static void vcpu_init(qemu_plugin_id_t id, unsigned int vcpu_index) {
   VCPU *vcpu = g_malloc0(sizeof(VCPU));
   vcpu->registers = registers_init(vcpu_index);
   g_array_insert_vals(state.vcpus, vcpu_index, &vcpu, 1);
-  FrameBuffer *vcpu_frame_buffer = frame_buffer_init(FRAME_BUFFER_SIZE_DEFAULT);
+  FrameBuffer *vcpu_frame_buffer = frame_buffer_new(FRAME_BUFFER_SIZE_DEFAULT);
   g_ptr_array_insert(state.frame_buffer, vcpu_index, &vcpu_frame_buffer);
 
   g_rw_lock_writer_unlock(&state.frame_buffer_lock);

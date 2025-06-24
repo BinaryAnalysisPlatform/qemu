@@ -34,6 +34,7 @@ dep_libprotobuf = declare_dependency(
 )
 
 bap_tracing_src = files(
+  'frame_buffer.c',
   'tracing.c',
   'tracewrap.c',
 )
