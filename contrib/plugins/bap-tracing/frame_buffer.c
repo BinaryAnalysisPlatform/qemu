@@ -166,9 +166,9 @@ bool frame_buffer_new_frame_std(FrameBuffer *buf, unsigned int thread_id,
 bool frame_buffer_append_reg_info(FrameBuffer *buf, const char *name,
                                   const GByteArray *content,
                                   OperandAccess acc) {
-  OperandInfo *rinfo =
+  OperandInfo *oi =
       frame_init_reg_operand_info(name, content->data, content->len, acc);
-  g_assert(rinfo);
+  g_assert(oi);
   Frame *frame = buf->fbuf[buf->idx];
   if (!frame) {
     qemu_plugin_outs(
