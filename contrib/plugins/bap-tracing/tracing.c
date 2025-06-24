@@ -40,8 +40,8 @@ static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
     qemu_plugin_reg_descriptor *reg =
         &g_array_index(current_regs, qemu_plugin_reg_descriptor, i);
     qemu_plugin_read_register(reg->handle, rtmp);
-    OperandInfo *rinfo = init_reg_operand_info(reg->name, rtmp->data,
-                                               rtmp->len, OperandRead);
+    OperandInfo *rinfo =
+        init_reg_operand_info(reg->name, rtmp->data, rtmp->len, OperandRead);
     g_assert(rinfo);
     frame_buffer_append_op_info(fbuf, rinfo);
   }

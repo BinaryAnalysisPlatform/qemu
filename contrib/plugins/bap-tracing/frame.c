@@ -24,19 +24,19 @@ Frame *frame_new_std(uint64_t addr, int vcpu_id) {
 }
 
 void frame_add_operand(Frame *frame, OperandInfo *oi) {
-    OperandValueList *ol;
-    if (oi->operand_usage->written) {
-        ol = frame->std_frame->operand_post_list;
-    } else {
-        ol = frame->std_frame->operand_pre_list;
-    }
+  OperandValueList *ol;
+  if (oi->operand_usage->written) {
+    ol = frame->std_frame->operand_post_list;
+  } else {
+    ol = frame->std_frame->operand_pre_list;
+  }
 
-    oi->taint_info = g_new(TaintInfo, 1);
-    taint_info__init(oi->taint_info);
-    oi->taint_info->no_taint = 1;
-    oi->taint_info->has_no_taint = 1;
+  oi->taint_info = g_new(TaintInfo, 1);
+  taint_info__init(oi->taint_info);
+  oi->taint_info->no_taint = 1;
+  oi->taint_info->has_no_taint = 1;
 
-    ol->n_elem += 1;
-    ol->elem = g_renew(OperandInfo *, ol->elem, ol->n_elem);
-    ol->elem[ol->n_elem - 1] = oi;
+  ol->n_elem += 1;
+  ol->elem = g_renew(OperandInfo *, ol->elem, ol->n_elem);
+  ol->elem[ol->n_elem - 1] = oi;
 }

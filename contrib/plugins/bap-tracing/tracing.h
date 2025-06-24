@@ -29,7 +29,7 @@ typedef struct {
 
 typedef struct {
   uint8_t bytes[MAX_INSTRUCTION_SIZE]; ///< Instruction bytes.
-  size_t size; ///< Len of instruction in bytes.
+  size_t size;                         ///< Len of instruction in bytes.
   uint64_t vaddr;
 } Instruction;
 
