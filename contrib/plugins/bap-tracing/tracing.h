@@ -39,7 +39,7 @@ typedef struct {
 
 typedef struct {
   GRWLock vcpus_array_lock;
-  GArray /*<VCPU>*/ *vcpus;
+  GPtrArray /*<VCPU>*/ *vcpus;
 
   GRWLock frame_buffer_lock;
   GPtrArray /*<FrameBuffer>*/ *frame_buffer; ///< Indexed by vcpu id

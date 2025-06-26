@@ -4,6 +4,7 @@
 #include <glib.h>
 
 #include "frame_buffer.h"
+#include "qemu-plugin.h"
 #include "tracing.h"
 
 static TraceState state;
@@ -51,12 +52,39 @@ static void add_new_insn_frame(VCPU *vcpu, unsigned int vcpu_index,
                              insn->size);
 }
 
+static GPtrArray *registers_init(void) {
+  GArray *reg_list = qemu_plugin_get_registers();
+
+  if (reg_list->len == 0) {
+    g_array_free(reg_list, false);
+    return NULL;
+  }
+  GPtrArray *registers = g_ptr_array_new();
+  for (size_t r = 0; r < reg_list->len; r++) {
+    qemu_plugin_reg_descriptor *rd =
+        &g_array_index(reg_list, qemu_plugin_reg_descriptor, r);
+    Register *reg = init_vcpu_register(rd);
+    g_ptr_array_add(registers, reg);
+  }
+
+  return registers->len ? g_steal_pointer(&registers) : NULL;
+}
+
 static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   g_rw_lock_reader_lock(&state.vcpus_array_lock);
   g_rw_lock_reader_lock(&state.frame_buffer_lock);
 
   FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, vcpu_index);
-  VCPU *vcpu = &g_array_index(state.vcpus, VCPU, vcpu_index);
+  VCPU *vcpu = g_ptr_array_index(state.vcpus, vcpu_index);
+  g_assert(vcpu);
+  if (!vcpu->registers) {
+    vcpu->registers = registers_init();
+    if (!vcpu->registers) {
+      // Registers are still not available. So return until the VCPU is
+      // sufficiently initialized.
+      goto unlock_return;
+    }
+  }
   GArray *current_regs = qemu_plugin_get_registers();
   g_assert(current_regs->len == vcpu->registers->len);
 
@@ -73,6 +101,7 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   add_new_insn_frame(vcpu, vcpu_index, fbuf, insn);
   add_pre_reg_state(vcpu, vcpu_index, current_regs, fbuf);
 
+unlock_return:
   g_rw_lock_reader_unlock(&state.frame_buffer_lock);
   g_rw_lock_reader_unlock(&state.vcpus_array_lock);
 }
@@ -80,33 +109,15 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
 Register *init_vcpu_register(qemu_plugin_reg_descriptor *desc) {
   Register *reg = g_new0(Register, 1);
   g_autofree gchar *lower = g_utf8_strdown(desc->name, -1);
-  int r;
 
   reg->handle = desc->handle;
   reg->name = g_intern_string(lower);
   reg->content = g_byte_array_new();
 
   /* read the initial value */
-  r = qemu_plugin_read_register(reg->handle, reg->content);
+  int r = qemu_plugin_read_register(reg->handle, reg->content);
   g_assert(r > 0);
   return reg;
-}
-
-static GPtrArray *registers_init(int vcpu_index) {
-  g_autoptr(GPtrArray) registers = g_ptr_array_new();
-  g_autoptr(GArray) reg_list = qemu_plugin_get_registers();
-
-  if (!reg_list->len) {
-    return NULL;
-  }
-  for (int r = 0; r < reg_list->len; r++) {
-    qemu_plugin_reg_descriptor *rd =
-        &g_array_index(reg_list, qemu_plugin_reg_descriptor, r);
-    Register *reg = init_vcpu_register(rd);
-    g_ptr_array_add(registers, reg);
-  }
-
-  return registers->len ? g_steal_pointer(&registers) : NULL;
 }
 
 static void vcpu_init(qemu_plugin_id_t id, unsigned int vcpu_index) {
@@ -114,10 +125,10 @@ static void vcpu_init(qemu_plugin_id_t id, unsigned int vcpu_index) {
   g_rw_lock_writer_lock(&state.frame_buffer_lock);
 
   VCPU *vcpu = g_malloc0(sizeof(VCPU));
-  vcpu->registers = registers_init(vcpu_index);
-  g_array_insert_vals(state.vcpus, vcpu_index, &vcpu, 1);
+  g_ptr_array_insert(state.vcpus, vcpu_index, vcpu);
+
   FrameBuffer *vcpu_frame_buffer = frame_buffer_new(FRAME_BUFFER_SIZE_DEFAULT);
-  g_ptr_array_insert(state.frame_buffer, vcpu_index, &vcpu_frame_buffer);
+  g_ptr_array_insert(state.frame_buffer, vcpu_index, vcpu_frame_buffer);
 
   g_rw_lock_writer_unlock(&state.frame_buffer_lock);
   g_rw_lock_writer_unlock(&state.vcpus_array_lock);
@@ -155,10 +166,13 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
                                            char **argv) {
   const char *target_path = "/tmp/test.trace";
   state.frame_buffer = g_ptr_array_new();
-  state.vcpus = g_array_new(false, true, sizeof(VCPU));
+  state.vcpus = g_ptr_array_new();
   state.file = fopen(target_path, "wb");
   if (!(state.frame_buffer || state.vcpus || state.file)) {
     return 1;
+  }
+  for (size_t i = 0; i < argc; ++i) {
+    qemu_plugin_outs(argv[i]);
   }
   // write_header();
   // write_meta(argv, envp, target_argv, target_envp);
