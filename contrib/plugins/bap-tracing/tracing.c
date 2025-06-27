@@ -15,6 +15,7 @@ static void log_insn_mem_access(unsigned int vcpu_index,
 
 static void add_post_reg_state(VCPU *vcpu, unsigned int vcpu_index,
                                GArray *current_regs, FrameBuffer *fbuf) {
+
   GByteArray *rdata = g_byte_array_new();
   for (size_t i = 0; i < current_regs->len; ++i) {
     Register *prev_reg = vcpu->registers->pdata[i];
@@ -28,7 +29,8 @@ static void add_post_reg_state(VCPU *vcpu, unsigned int vcpu_index,
       continue;
     }
 
-    if (!frame_buffer_append_reg_info(fbuf, reg->name, rdata, OperandWritten)) {
+    if (!frame_buffer_append_reg_info(fbuf, reg->name, rdata, s,
+                                      OperandWritten)) {
       qemu_plugin_outs("Failed to append opinfo.\n");
       g_assert(false);
     }
@@ -41,15 +43,15 @@ static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
   for (size_t i = 0; i < current_regs->len; ++i) {
     qemu_plugin_reg_descriptor *reg =
         &g_array_index(current_regs, qemu_plugin_reg_descriptor, i);
-    qemu_plugin_read_register(reg->handle, rdata);
-    frame_buffer_append_reg_info(fbuf, reg->name, rdata, OperandRead);
+    size_t s = qemu_plugin_read_register(reg->handle, rdata);
+    frame_buffer_append_reg_info(fbuf, reg->name, rdata, s, OperandRead);
   }
 }
 
-static void add_new_insn_frame(VCPU *vcpu, unsigned int vcpu_index,
+static bool add_new_insn_frame(VCPU *vcpu, unsigned int vcpu_index,
                                FrameBuffer *fbuf, Instruction *insn) {
-  frame_buffer_new_frame_std(fbuf, vcpu_index, insn->vaddr, insn->bytes,
-                             insn->size);
+  return frame_buffer_new_frame_std(fbuf, vcpu_index, insn->vaddr, insn->bytes,
+                                    insn->size);
 }
 
 static GPtrArray *registers_init(void) {
@@ -77,18 +79,13 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, vcpu_index);
   VCPU *vcpu = g_ptr_array_index(state.vcpus, vcpu_index);
   g_assert(vcpu);
-  if (!vcpu->registers) {
-    vcpu->registers = registers_init();
-    if (!vcpu->registers) {
-      // Registers are still not available. So return until the VCPU is
-      // sufficiently initialized.
-      goto unlock_return;
-    }
-  }
   GArray *current_regs = qemu_plugin_get_registers();
   g_assert(current_regs->len == vcpu->registers->len);
 
-  add_post_reg_state(vcpu, vcpu_index, current_regs, fbuf);
+  if (!frame_buffer_is_empty(fbuf)) {
+    add_post_reg_state(vcpu, vcpu_index, current_regs, fbuf);
+    frame_buffer_close_frame(fbuf);
+  }
 
   if (frame_buffer_is_full(fbuf)) {
     g_rw_lock_writer_lock(&state.file_lock);
@@ -101,7 +98,6 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   add_new_insn_frame(vcpu, vcpu_index, fbuf, insn);
   add_pre_reg_state(vcpu, vcpu_index, current_regs, fbuf);
 
-unlock_return:
   g_rw_lock_reader_unlock(&state.frame_buffer_lock);
   g_rw_lock_reader_unlock(&state.vcpus_array_lock);
 }
@@ -125,6 +121,10 @@ static void vcpu_init(qemu_plugin_id_t id, unsigned int vcpu_index) {
   g_rw_lock_writer_lock(&state.frame_buffer_lock);
 
   VCPU *vcpu = g_malloc0(sizeof(VCPU));
+  vcpu->registers = registers_init();
+  if (!vcpu->registers) {
+    g_assert(false);
+  }
   g_ptr_array_insert(state.vcpus, vcpu_index, vcpu);
 
   FrameBuffer *vcpu_frame_buffer = frame_buffer_new(FRAME_BUFFER_SIZE_DEFAULT);

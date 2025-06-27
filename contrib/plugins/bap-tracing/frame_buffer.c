@@ -95,7 +95,62 @@ FrameBuffer *frame_buffer_new(size_t size) {
 }
 
 bool frame_buffer_is_full(const FrameBuffer *buf) {
-  return buf->idx >= buf->max_size;
+  return buf->idx + 1 >= buf->max_size;
+}
+
+void frame_buffer_close_frame(FrameBuffer *buf) {
+  char *str = frame_buffer_as_str(buf);
+  qemu_plugin_outs("Close frame: ");
+  qemu_plugin_outs(str);
+  qemu_plugin_outs("\n\n");
+  g_free(str);
+  buf->idx++;
+}
+
+#define FRAME_STR_SIZE 8192
+
+#define APPEND(...)                                                            \
+  snprintf(str + off, max - off, __VA_ARGS__);                                 \
+  off = strlen(str);
+
+char *frame_buffer_as_str(const FrameBuffer *buf) {
+  char *str = g_malloc0(FRAME_STR_SIZE);
+  const Frame *frame = buf->fbuf[buf->idx];
+  if (!frame) {
+    snprintf(str, FRAME_STR_SIZE, "<NULL>");
+    return str;
+  }
+  size_t max = FRAME_STR_SIZE - 1;
+  snprintf(str, max, "{ pre: [ ");
+  size_t off = strlen(str);
+
+  StdFrame *sframe = frame->std_frame;
+  for (size_t i = 0; i < sframe->operand_pre_list->n_elem; i++) {
+    OperandInfo *oi = sframe->operand_pre_list->elem[i];
+    APPEND("r:%s=", oi->operand_info_specific->reg_operand->name);
+
+    for (size_t k = 0; k < oi->value.len; ++k) {
+      APPEND("%02x", oi->value.data[k]);
+    }
+    APPEND(", ");
+  }
+  APPEND(" ], post: [ ");
+  for (size_t i = 0; i < sframe->operand_post_list->n_elem; i++) {
+    OperandInfo *oi = sframe->operand_post_list->elem[i];
+    APPEND("r:%s=", oi->operand_info_specific->reg_operand->name);
+
+    for (size_t k = 0; k < oi->value.len; ++k) {
+      APPEND("%02x", oi->value.data[k]);
+    }
+    APPEND(", ");
+  }
+
+  APPEND("]}");
+  return str;
+}
+
+bool frame_buffer_is_empty(const FrameBuffer *buf) {
+  return buf->fbuf[buf->idx] == NULL;
 }
 
 void frame_buffer_flush_to_file(FrameBuffer *buf, WLOCKED FILE *file) {
@@ -143,15 +198,15 @@ bool frame_buffer_new_frame_std(FrameBuffer *buf, unsigned int thread_id,
   ol_out->n_elem = 0;
   stdframe->operand_post_list = ol_out;
 
-  buf->fbuf[buf->idx++] = frame;
+  buf->fbuf[buf->idx] = frame;
   return true;
 }
 
 bool frame_buffer_append_reg_info(FrameBuffer *buf, const char *name,
-                                  const GByteArray *content,
+                                  const GByteArray *content, size_t reg_size,
                                   OperandAccess acc) {
-  OperandInfo *oi =
-      frame_init_reg_operand_info(name, content->data, content->len, acc);
+  OperandInfo *oi = frame_init_reg_operand_info(
+      name, content->data + content->len - reg_size, reg_size, acc);
   g_assert(oi);
   Frame *frame = buf->fbuf[buf->idx];
   if (!frame || !frame->std_frame) {

@@ -31,6 +31,9 @@ FrameBuffer *frame_buffer_new(size_t size);
 
 void frame_buffer_flush_to_file(FrameBuffer *buf, WLOCKED FILE *file);
 bool frame_buffer_is_full(const FrameBuffer *buf);
+bool frame_buffer_is_empty(const FrameBuffer *buf);
+void frame_buffer_close_frame(FrameBuffer *buf);
+char *frame_buffer_as_str(const FrameBuffer *buf);
 
 bool frame_buffer_new_frame_std(FrameBuffer *buf,
                                 unsigned int thread_id, uint64_t vaddr,
@@ -40,7 +43,7 @@ bool frame_buffer_new_frame_std(FrameBuffer *buf,
  * \brief Appends the given operand info to the open frame.
  */
 bool frame_buffer_append_reg_info(FrameBuffer *buf, const char *name,
-                                  const GByteArray *content,
+                                  const GByteArray *content, size_t reg_size,
                                   OperandAccess acc);
 
 OperandInfo *frame_init_reg_operand_info(const char *name, const uint8_t *value,
