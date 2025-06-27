@@ -9,9 +9,33 @@
 
 static TraceState state;
 
+static void add_mem_op(VCPU *vcpu, unsigned int vcpu_index, FrameBuffer *fbuf,
+                       uint64_t vaddr, qemu_plugin_mem_value *mval,
+                       bool is_store) {
+  if (!frame_buffer_append_mem_info(fbuf, vaddr, mval, is_store)) {
+    qemu_plugin_outs("Failed to append memory info\n");
+  }
+  return;
+}
+
 static void log_insn_mem_access(unsigned int vcpu_index,
                                 qemu_plugin_meminfo_t info, uint64_t vaddr,
-                                void *userdata) {}
+                                void *userdata) {
+  g_rw_lock_reader_lock(&state.vcpus_array_lock);
+  g_rw_lock_reader_lock(&state.frame_buffer_lock);
+
+  VCPU *vcpu = g_ptr_array_index(state.vcpus, vcpu_index);
+  g_assert(vcpu);
+  FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, vcpu_index);
+
+  bool is_store = qemu_plugin_mem_is_store(info);
+  qemu_plugin_mem_value mval = qemu_plugin_mem_get_value(info);
+
+  add_mem_op(vcpu, vcpu_index, fbuf, vaddr, &mval, is_store);
+
+  g_rw_lock_writer_unlock(&state.frame_buffer_lock);
+  g_rw_lock_writer_unlock(&state.vcpus_array_lock);
+}
 
 static void add_post_reg_state(VCPU *vcpu, unsigned int vcpu_index,
                                GArray *current_regs, FrameBuffer *fbuf) {
@@ -32,7 +56,7 @@ static void add_post_reg_state(VCPU *vcpu, unsigned int vcpu_index,
     if (!frame_buffer_append_reg_info(fbuf, reg->name, rdata, s,
                                       OperandWritten)) {
       qemu_plugin_outs("Failed to append opinfo.\n");
-      g_assert(false);
+      return;
     }
   }
 }
@@ -152,7 +176,7 @@ static void cb_trans(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
     qemu_plugin_register_vcpu_insn_exec_cb(tb_insn, log_insn_reg_access,
                                            QEMU_PLUGIN_CB_R_REGS, insn_data);
     qemu_plugin_register_vcpu_mem_cb(tb_insn, log_insn_mem_access,
-                                     QEMU_PLUGIN_CB_R_REGS, QEMU_PLUGIN_MEM_R,
+                                     QEMU_PLUGIN_CB_NO_REGS, QEMU_PLUGIN_MEM_R,
                                      NULL);
   }
 }

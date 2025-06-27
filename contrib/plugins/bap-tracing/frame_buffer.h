@@ -8,8 +8,8 @@
 #include <qemu-plugin.h>
 #include <stdio.h>
 
-#include "trace_meta.h"
 #include "frame.piqi.pb-c-patched.h"
+#include "trace_meta.h"
 
 typedef enum {
   OperandRead = 1,
@@ -17,9 +17,9 @@ typedef enum {
 } OperandAccess;
 
 typedef struct {
-  Frame **fbuf;    ///< The frames buffered.
-  size_t idx;      ///< Points to currently open frame.
-  size_t max_size; ///< Maximum number of elements fbuf can hold.
+  Frame **fbuf;          ///< The frames buffered.
+  size_t idx;            ///< Points to currently open frame.
+  size_t max_size;       ///< Maximum number of elements fbuf can hold.
   size_t frames_written; ///< Number of frames written from buffer to file.
 } FrameBuffer;
 
@@ -35,9 +35,12 @@ bool frame_buffer_is_empty(const FrameBuffer *buf);
 void frame_buffer_close_frame(FrameBuffer *buf);
 char *frame_buffer_as_str(const FrameBuffer *buf);
 
-bool frame_buffer_new_frame_std(FrameBuffer *buf,
-                                unsigned int thread_id, uint64_t vaddr,
-                                uint8_t *bytes, size_t bytes_len);
+bool frame_buffer_new_frame_std(FrameBuffer *buf, unsigned int thread_id,
+                                uint64_t vaddr, uint8_t *bytes,
+                                size_t bytes_len);
+
+bool frame_buffer_append_mem_info(FrameBuffer *fbuf, uint64_t vaddr,
+                                  qemu_plugin_mem_value *mval, bool is_store);
 
 /**
  * \brief Appends the given operand info to the open frame.

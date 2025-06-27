@@ -127,7 +127,11 @@ char *frame_buffer_as_str(const FrameBuffer *buf) {
   StdFrame *sframe = frame->std_frame;
   for (size_t i = 0; i < sframe->operand_pre_list->n_elem; i++) {
     OperandInfo *oi = sframe->operand_pre_list->elem[i];
-    APPEND("r:%s=", oi->operand_info_specific->reg_operand->name);
+    if (oi->operand_info_specific->reg_operand) {
+      APPEND("r:%s=", oi->operand_info_specific->reg_operand->name);
+    } else {
+      APPEND("m:0x%016lx=", oi->operand_info_specific->mem_operand->address);
+    }
 
     for (size_t k = 0; k < oi->value.len; ++k) {
       APPEND("%02x", oi->value.data[k]);
@@ -137,7 +141,11 @@ char *frame_buffer_as_str(const FrameBuffer *buf) {
   APPEND(" ], post: [ ");
   for (size_t i = 0; i < sframe->operand_post_list->n_elem; i++) {
     OperandInfo *oi = sframe->operand_post_list->elem[i];
-    APPEND("r:%s=", oi->operand_info_specific->reg_operand->name);
+    if (oi->operand_info_specific->reg_operand) {
+      APPEND("r:%s=", oi->operand_info_specific->reg_operand->name);
+    } else {
+      APPEND("m:0x%016lx=", oi->operand_info_specific->mem_operand->address);
+    }
 
     for (size_t k = 0; k < oi->value.len; ++k) {
       APPEND("%02x", oi->value.data[k]);
@@ -202,12 +210,7 @@ bool frame_buffer_new_frame_std(FrameBuffer *buf, unsigned int thread_id,
   return true;
 }
 
-bool frame_buffer_append_reg_info(FrameBuffer *buf, const char *name,
-                                  const GByteArray *content, size_t reg_size,
-                                  OperandAccess acc) {
-  OperandInfo *oi = frame_init_reg_operand_info(
-      name, content->data + content->len - reg_size, reg_size, acc);
-  g_assert(oi);
+static bool append_op_info(FrameBuffer *buf, OperandInfo *oi) {
   Frame *frame = buf->fbuf[buf->idx];
   if (!frame || !frame->std_frame) {
     qemu_plugin_outs(
@@ -215,6 +218,15 @@ bool frame_buffer_append_reg_info(FrameBuffer *buf, const char *name,
     return false;
   }
   return std_frame_add_operand(frame->std_frame, oi);
+}
+
+bool frame_buffer_append_reg_info(FrameBuffer *buf, const char *name,
+                                  const GByteArray *content, size_t reg_size,
+                                  OperandAccess acc) {
+  OperandInfo *oi = frame_init_reg_operand_info(
+      name, content->data + content->len - reg_size, reg_size, acc);
+  g_assert(oi);
+  return append_op_info(buf, oi);
 }
 
 OperandInfo *frame_init_reg_operand_info(const char *name, const uint8_t *value,
@@ -242,4 +254,89 @@ OperandInfo *frame_init_reg_operand_info(const char *name, const uint8_t *value,
   memcpy(oi->value.data, value, value_size);
 
   return oi;
+}
+
+static size_t mval_type_to_int(enum qemu_plugin_mem_value_type type) {
+  switch (type) {
+  case QEMU_PLUGIN_MEM_VALUE_U8:
+    return 8;
+  case QEMU_PLUGIN_MEM_VALUE_U16:
+    return 16;
+  case QEMU_PLUGIN_MEM_VALUE_U32:
+    return 32;
+  case QEMU_PLUGIN_MEM_VALUE_U64:
+    return 64;
+  case QEMU_PLUGIN_MEM_VALUE_U128:
+    return 128;
+  default:
+    g_assert(false);
+  }
+}
+
+static void mval_to_buf(qemu_plugin_mem_value *val, uint8_t *buf) {
+  switch (val->type) {
+  case QEMU_PLUGIN_MEM_VALUE_U8:
+    buf[0] = val->data.u8;
+    return;
+  case QEMU_PLUGIN_MEM_VALUE_U16:
+    buf[0] = (uint8_t)val->data.u16;
+    buf[1] = (uint8_t)(val->data.u16 >> 8);
+    return;
+  case QEMU_PLUGIN_MEM_VALUE_U32:
+    buf[0] = (uint8_t)val->data.u32;
+    buf[1] = (uint8_t)(val->data.u32 >> 8);
+    buf[2] = (uint8_t)(val->data.u32 >> 16);
+    buf[3] = (uint8_t)(val->data.u32 >> 24);
+    return;
+  case QEMU_PLUGIN_MEM_VALUE_U64:
+    for (size_t i = 0; i < 8; ++i) {
+      buf[i] = (uint8_t)(val->data.u64 >> (i * 8));
+    }
+    return;
+  case QEMU_PLUGIN_MEM_VALUE_U128:
+    for (size_t i = 0; i < 8; ++i) {
+      buf[i] = (uint8_t)(val->data.u128.low >> (i * 8));
+    }
+    for (size_t i = 0; i < 8; ++i) {
+      buf[i + 8] = (uint8_t)(val->data.u128.high >> (i * 8));
+    }
+    return;
+  default:
+    g_assert(false);
+  }
+}
+
+static OperandInfo *frame_init_mem_operand_info(uint64_t vaddr,
+                                                qemu_plugin_mem_value *mval,
+                                                bool is_store) {
+  MemOperand *ro = g_new(MemOperand, 1);
+  mem_operand__init(ro);
+  ro->address = vaddr;
+
+  OperandInfoSpecific *ois = g_new(OperandInfoSpecific, 1);
+  operand_info_specific__init(ois);
+  ois->mem_operand = ro;
+
+  size_t byte_width = mval_type_to_int(mval->type) / 8;
+  OperandUsage *ou = g_new(OperandUsage, 1);
+  operand_usage__init(ou);
+  ou->read = !is_store;
+  ou->written = is_store;
+  OperandInfo *oi = g_new(OperandInfo, 1);
+  operand_info__init(oi);
+  oi->bit_length = mval_type_to_int(mval->type);
+  oi->operand_info_specific = ois;
+  oi->operand_usage = ou;
+  oi->value.len = byte_width;
+  oi->value.data = g_malloc(oi->value.len);
+  mval_to_buf(mval, oi->value.data);
+
+  return oi;
+}
+
+bool frame_buffer_append_mem_info(FrameBuffer *fbuf, uint64_t vaddr,
+                                  qemu_plugin_mem_value *mval, bool is_store) {
+  OperandInfo *oi = frame_init_mem_operand_info(vaddr, mval, is_store);
+  g_assert(oi);
+  return append_op_info(fbuf, oi);
 }
