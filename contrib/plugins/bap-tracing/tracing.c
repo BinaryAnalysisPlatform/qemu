@@ -3,6 +3,7 @@
 
 #include <glib.h>
 
+#include "frame_arch.h"
 #include "frame_buffer.h"
 #include "qemu-plugin.h"
 #include "tracing.h"
@@ -185,9 +186,46 @@ static void plugin_exit(qemu_plugin_id_t id, void *udata) {
   // Dump rest of frames to file.
 }
 
+static bool get_frame_arch_mach(const char *target_name, uint64_t *arch,
+                                uint64_t *mach) {
+  *arch = 0;
+  *arch = frame_arch_last;
+  const char *aname = arch_map[0].name;
+  for (size_t i = 0; arch_map[i].name; ++i) {
+    aname = arch_map[i].name;
+    if (!strncmp(aname, target_name, strlen(aname))) {
+      *arch = arch_map[i].val;
+      break;
+    }
+  }
+  return *arch != frame_arch_last;
+}
+
+static bool write_header(FILE *file, const char *target_name) {
+  uint64_t frame_arch = 0;
+  uint64_t frame_mach = 0;
+  if (!get_frame_arch_mach(target_name, &frame_arch, &frame_mach)) {
+    qemu_plugin_outs("Failed to get arch/mach.\n");
+    return false;
+  }
+  uint64_t num_frames = 0ULL;
+  uint64_t toc_off = 0ULL;
+  WRITE(magic_number);
+  WRITE(out_trace_version);
+  WRITE(frame_arch);
+  WRITE(frame_mach);
+  WRITE(num_frames);
+  WRITE(toc_off);
+  return true;
+}
+
 QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
                                            const qemu_info_t *info, int argc,
                                            char **argv) {
+  qemu_plugin_outs("Target name: ");
+  qemu_plugin_outs(info->target_name);
+  qemu_plugin_outs("\n");
+
   const char *target_path = "/tmp/test.trace";
   state.frame_buffer = g_ptr_array_new();
   state.vcpus = g_ptr_array_new();
@@ -198,7 +236,10 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
   for (size_t i = 0; i < argc; ++i) {
     qemu_plugin_outs(argv[i]);
   }
-  // write_header();
+  if (!write_header(state.file, info->target_name)) {
+    qemu_plugin_outs("Failed to header.\n");
+    return 1;
+  }
   // write_meta(argv, envp, target_argv, target_envp);
 
   qemu_plugin_register_vcpu_init_cb(id, vcpu_init);

@@ -10,6 +10,9 @@ piqi_src = custom_target('piqi',
   output: 'frame.piqi.proto',
   command: [piqi, 'to-proto', '@INPUT@', '-o', '@OUTPUT@'])
 
+frame_arch_h = fs.copyfile('bap-frames/libtrace/src/frame_arch.h',
+  'frame_arch.h')
+
 # protobuf file -> C code
 frame_proto_src_raw = custom_target('proto',
   input: piqi_src,
@@ -30,7 +33,7 @@ frame_proto_src = custom_target(
 libprotobuf = dependency('libprotobuf-c')
 frame_protobuf = static_library('protobuf', [frame_proto_src], pic: true)
 dep_libprotobuf = declare_dependency(
-    sources : frame_proto_src,
+    sources : [frame_proto_src, frame_arch_h],
     link_with : [frame_protobuf],
     dependencies: [libprotobuf]
 )
