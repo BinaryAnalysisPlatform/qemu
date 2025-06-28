@@ -4,6 +4,8 @@
 #ifndef BAP_TRACE_META_H
 #define BAP_TRACE_META_H
 
+#include <err.h>
+
 /**
  * \brief Empty macros indicate the argument, variable etc.
  * must be locked for writing.
@@ -13,13 +15,19 @@
 #define WRITE(x)                                                               \
   do {                                                                         \
     if (fwrite(&(x), sizeof(x), 1, file) != 1)                                 \
-      qemu_plugin_outs("fwrite failed");                                       \
+      err(1, "fwrite failed");                                                 \
   } while (0)
 
 #define WRITE_BUF(x, n)                                                        \
   do {                                                                         \
     if (fwrite((x), 1, (n), file) != n)                                        \
-      qemu_plugin_outs("fwrite failed");                                       \
+      err(1, "fwrite failed");                                                 \
+  } while (0)
+
+#define SEEK(off)                                                              \
+  do {                                                                         \
+    if (fseek(file, (off), SEEK_SET) < 0)                                      \
+      err(1, "stream not seekable");                                           \
   } while (0)
 
 #endif

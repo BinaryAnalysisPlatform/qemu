@@ -28,7 +28,7 @@ typedef struct {
  */
 FrameBuffer *frame_buffer_new(void);
 
-void frame_buffer_flush_to_file(FrameBuffer *buf, WLOCKED FILE *file);
+uint64_t frame_buffer_flush_to_file(FrameBuffer *buf, WLOCKED FILE *file);
 bool frame_buffer_is_full(const FrameBuffer *buf);
 bool frame_buffer_is_empty(const FrameBuffer *buf);
 void frame_buffer_close_frame(FrameBuffer *buf);

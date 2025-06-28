@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 #include <glib.h>
+#include <stdio.h>
 
 #include "frame_arch.h"
 #include "frame_buffer.h"
 #include "qemu-plugin.h"
+#include "trace_consts.h"
 #include "tracing.h"
 
-static TraceState state;
+static TraceState state = {0};
 
 static void add_mem_op(VCPU *vcpu, unsigned int vcpu_index, FrameBuffer *fbuf,
                        uint64_t vaddr, qemu_plugin_mem_value *mval,
@@ -100,9 +102,13 @@ static GPtrArray *registers_init(void) {
 static void write_toc_entry(FrameBuffer *fbuf) {
   g_rw_lock_writer_lock(&state.file_lock);
   g_rw_lock_writer_lock(&state.toc_entries_offsets_lock);
-  frame_buffer_flush_to_file(fbuf, state.file);
+  g_rw_lock_writer_lock(&state.total_num_frames_lock);
+
+  state.total_num_frames += frame_buffer_flush_to_file(fbuf, state.file);
   uint64_t next_toc_entry = ftell(state.file);
   g_array_append_val(state.toc_entries_offsets, next_toc_entry);
+
+  g_rw_lock_writer_unlock(&state.total_num_frames_lock);
   g_rw_lock_writer_unlock(&state.toc_entries_offsets_lock);
   g_rw_lock_writer_unlock(&state.file_lock);
 }
@@ -155,9 +161,7 @@ static void vcpu_init(qemu_plugin_id_t id, unsigned int vcpu_index) {
 
   VCPU *vcpu = g_malloc0(sizeof(VCPU));
   vcpu->registers = registers_init();
-  if (!vcpu->registers) {
-    g_assert(false);
-  }
+  g_assert(vcpu->registers);
   g_ptr_array_insert(state.vcpus, vcpu_index, vcpu);
 
   FrameBuffer *vcpu_frame_buffer = frame_buffer_new();
@@ -191,12 +195,46 @@ static void cb_trans(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
 }
 
 static void plugin_exit(qemu_plugin_id_t id, void *udata) {
-  // Dump rest of frames to file.
+  g_rw_lock_writer_lock(&state.frame_buffer_lock);
+  for (size_t i = 0; i < state.vcpus->len; ++i) {
+    FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, i);
+    write_toc_entry(fbuf);
+  }
+  g_rw_lock_writer_unlock(&state.frame_buffer_lock);
+
+  g_rw_lock_writer_lock(&state.file_lock);
+  g_rw_lock_reader_lock(&state.toc_entries_offsets_lock);
+  g_rw_lock_reader_lock(&state.total_num_frames_lock);
+
+  FILE *file = state.file;
+
+  // Update fields in the header
+  uint64_t toc_index_offset = ftell(file);
+  SEEK(offset_toc_index_offset);
+  WRITE(toc_index_offset);
+  SEEK(offset_total_num_frames);
+  WRITE(state.total_num_frames);
+
+  // Write the TOC index
+  SEEK(toc_index_offset);
+  uint64_t m = state.toc_entries_offsets->len;
+  WRITE(m);
+
+  for (size_t i = 0; i < m; ++i) {
+    uint64_t toc_entry_off =
+        g_array_index(state.toc_entries_offsets, uint64_t, i);
+    WRITE(toc_entry_off);
+  }
+  fclose(file);
+
+  g_rw_lock_reader_unlock(&state.total_num_frames_lock);
+  g_rw_lock_reader_unlock(&state.toc_entries_offsets_lock);
+  g_rw_lock_writer_unlock(&state.file_lock);
 }
 
 static bool get_frame_arch_mach(const char *target_name, uint64_t *arch,
                                 uint64_t *mach) {
-  *arch = 0;
+  *mach = 0;
   *arch = frame_arch_last;
   const char *aname = arch_map[0].name;
   for (size_t i = 0; arch_map[i].name; ++i) {
@@ -216,13 +254,13 @@ static bool write_header(FILE *file, const char *target_name) {
     qemu_plugin_outs("Failed to get arch/mach.\n");
     return false;
   }
-  uint64_t num_toc_entries = 0ULL;
+  uint64_t total_num_frames = 0ULL;
   uint64_t toc_index_offset = 0ULL;
   WRITE(magic_number);
   WRITE(trace_version);
   WRITE(frame_arch);
   WRITE(frame_mach);
-  WRITE(num_toc_entries);  // Gets updated later
+  WRITE(total_num_frames); // Gets updated later
   WRITE(toc_index_offset); // Gets updated later
   return true;
 }

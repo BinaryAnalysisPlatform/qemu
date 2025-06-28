@@ -137,6 +137,9 @@ typedef struct {
   GRWLock toc_entries_offsets_lock;
   GArray /*<uint64_t>*/ *toc_entries_offsets;
 
+  GRWLock total_num_frames_lock;
+  uint64_t total_num_frames;
+
   GRWLock file_lock;
   FILE *file;
 } TraceState;

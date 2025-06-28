@@ -44,7 +44,7 @@ the BAP-frames repository.
 |    0x8    | uint64_t | trace version number | |
 |    0x10    | uint64_t | frame_architecture | |
 |    0x18    | uint64_t | frame_machine, 0 for unspecified. | |
-|    0x20    | uint64_t | n = number of frames per TOC entry. | |
+|    0x20    | uint64_t | n = total number of frames in trace. | |
 |    0x28    | uint64_t | T = offset to TOC index. | |
 |    0x30    | uint64_t | sizeof(frame_0) | TOC begin  |
 |    0x38    | meta_frame   | frame_0 | |
