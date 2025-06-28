@@ -21,3 +21,40 @@ cd build
 ../configure --enable-plugins --target-list=<target>
 make
 ```
+
+## Trace format
+
+The generated trace consists of three parts: the header,
+a table of contents (TOC) holding the frame entries, and an index into the TOC.
+
+Each frame entry starts with the size of the frame, followed by the actual frame data.
+A fixed number of frame entries are considered one _entry_ in the TOC.
+
+The TOC index is stored at the end.
+
+For specifics about the frame contents, please refer
+to the [definitions](https://github.com/BinaryAnalysisPlatform/bap-frames/tree/master/piqi) in
+the BAP-frames repository.
+
+**Format**
+
+| Offset | Type | Field | Trace section |
+|--------|------|-------|------|
+|    0x0    | uint64_t | magic number (7456879624156307493LL) | Header begin |
+|    0x8    | uint64_t | trace version number | |
+|    0x10    | uint64_t | frame_architecture | |
+|    0x18    | uint64_t | frame_machine, 0 for unspecified. | |
+|    0x20    | uint64_t | n = number of frames per TOC entry. | |
+|    0x28    | uint64_t | T = offset to TOC index. | |
+|    0x30    | uint64_t | sizeof(frame_0) | TOC begin  |
+|    0x38    | meta_frame   | frame_0 | |
+|    0x40    | uint64_t     | sizeof(frame_1) | |
+|    0x48    | type(frame_1) | frame_1 | |
+|    ...     | ...          | ... | |
+|    T-0x10  | uint64_t     | sizeof(frame_n-1) | |
+|    T-0x8   | type(frame_n-1) | frame_n-1 | |
+|    T+0     | uint64_t     | m = number of TOC entries | TOC index begin |
+|    T+0x8   | uint64_t     | offset toc_entry(0) | |
+|    T+0x10  | uint64_t     | offset toc_entry(1) | |
+|    ...     | ...          | ... | |
+|    T+0x8+(0x8*m)   | uint64_t     | offset toc_entry(m-1) | |
