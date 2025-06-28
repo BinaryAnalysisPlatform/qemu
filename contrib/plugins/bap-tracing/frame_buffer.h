@@ -20,7 +20,6 @@ typedef enum {
 typedef struct {
   Frame *fbuf[FRAMES_PER_TOC_ENTRY_]; ///< The frames buffered.
   size_t idx;                         ///< Points to currently open frame.
-  size_t frames_written; ///< Number of frames written from buffer to file.
 } FrameBuffer;
 
 /**

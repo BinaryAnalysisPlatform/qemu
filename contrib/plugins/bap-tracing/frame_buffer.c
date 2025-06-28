@@ -159,6 +159,7 @@ bool frame_buffer_is_empty(const FrameBuffer *buf) {
   return buf->fbuf[buf->idx] == NULL;
 }
 
+/// @brief Dumps the file buffer as TOC entry into the file.
 void frame_buffer_flush_to_file(FrameBuffer *buf, WLOCKED FILE *file) {
   for (size_t i = 0; i <= buf->idx && i < frames_per_toc_entry; ++i) {
     Frame *frame = buf->fbuf[i];
@@ -167,12 +168,10 @@ void frame_buffer_flush_to_file(FrameBuffer *buf, WLOCKED FILE *file) {
     uint64_t packed_size = frame__pack(frame, packed_buffer);
     WRITE(packed_size);
     WRITE_BUF(packed_buffer, packed_size);
-    buf->frames_written++;
     frame_free(frame);
   }
   memset(buf->fbuf, 0, sizeof(buf->fbuf));
   buf->idx = 0;
-  // toc_update(); ??
 }
 
 bool frame_buffer_new_frame_std(FrameBuffer *buf, unsigned int thread_id,

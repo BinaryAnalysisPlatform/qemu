@@ -134,6 +134,9 @@ typedef struct {
   GRWLock frame_buffer_lock;
   GPtrArray /*<FrameBuffer>*/ *frame_buffer; ///< Indexed by vcpu id
 
+  GRWLock toc_entries_offsets_lock;
+  GArray /*<uint64_t>*/ *toc_entries_offsets;
+
   GRWLock file_lock;
   FILE *file;
 } TraceState;

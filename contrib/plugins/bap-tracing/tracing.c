@@ -97,9 +97,19 @@ static GPtrArray *registers_init(void) {
   return registers->len ? g_steal_pointer(&registers) : NULL;
 }
 
+static void write_toc_entry(FrameBuffer *fbuf) {
+  g_rw_lock_writer_lock(&state.file_lock);
+  g_rw_lock_writer_lock(&state.toc_entries_offsets_lock);
+  frame_buffer_flush_to_file(fbuf, state.file);
+  uint64_t next_toc_entry = ftell(state.file);
+  g_array_append_val(state.toc_entries_offsets, next_toc_entry);
+  g_rw_lock_writer_unlock(&state.toc_entries_offsets_lock);
+  g_rw_lock_writer_unlock(&state.file_lock);
+}
+
 static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   g_rw_lock_reader_lock(&state.vcpus_array_lock);
-  g_rw_lock_reader_lock(&state.frame_buffer_lock);
+  g_rw_lock_writer_lock(&state.frame_buffer_lock);
 
   FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, vcpu_index);
   VCPU *vcpu = g_ptr_array_index(state.vcpus, vcpu_index);
@@ -113,9 +123,7 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   }
 
   if (frame_buffer_is_full(fbuf)) {
-    g_rw_lock_writer_lock(&state.file_lock);
-    frame_buffer_flush_to_file(fbuf, state.file);
-    g_rw_lock_writer_unlock(&state.file_lock);
+    write_toc_entry(fbuf);
   }
 
   // Open new one.
@@ -123,7 +131,7 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   add_new_insn_frame(vcpu, vcpu_index, fbuf, insn);
   add_pre_reg_state(vcpu, vcpu_index, current_regs, fbuf);
 
-  g_rw_lock_reader_unlock(&state.frame_buffer_lock);
+  g_rw_lock_writer_unlock(&state.frame_buffer_lock);
   g_rw_lock_reader_unlock(&state.vcpus_array_lock);
 }
 
@@ -228,9 +236,11 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
 
   const char *target_path = "/tmp/test.trace";
   state.frame_buffer = g_ptr_array_new();
+  state.toc_entries_offsets = g_array_new(false, true, sizeof(uint64_t));
   state.vcpus = g_ptr_array_new();
   state.file = fopen(target_path, "wb");
-  if (!(state.frame_buffer || state.vcpus || state.file)) {
+  if (!(state.frame_buffer || state.vcpus || state.file ||
+        !state.toc_entries_offsets)) {
     return 1;
   }
   for (size_t i = 0; i < argc; ++i) {
@@ -241,6 +251,8 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
     return 1;
   }
   // write_meta(argv, envp, target_argv, target_envp);
+
+  g_array_append_val(state.toc_entries_offsets, offset_toc_start);
 
   qemu_plugin_register_vcpu_init_cb(id, vcpu_init);
   qemu_plugin_register_vcpu_tb_trans_cb(id, cb_trans);
