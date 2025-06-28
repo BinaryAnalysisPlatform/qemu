@@ -106,8 +106,6 @@ static struct arch_enum_entry arch_map[] = {
 
 QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
 
-#define FRAME_BUFFER_SIZE_DEFAULT 1024
-
 /**
  * \brief VLIW architecture have instructions longer than 4 or 8bytes.
  */

@@ -9,6 +9,7 @@
 #include <stdio.h>
 
 #include "frame.piqi.pb-c-patched.h"
+#include "trace_consts.h"
 #include "trace_meta.h"
 
 typedef enum {
@@ -17,9 +18,8 @@ typedef enum {
 } OperandAccess;
 
 typedef struct {
-  Frame **fbuf;          ///< The frames buffered.
-  size_t idx;            ///< Points to currently open frame.
-  size_t max_size;       ///< Maximum number of elements fbuf can hold.
+  Frame *fbuf[FRAMES_PER_TOC_ENTRY_]; ///< The frames buffered.
+  size_t idx;                         ///< Points to currently open frame.
   size_t frames_written; ///< Number of frames written from buffer to file.
 } FrameBuffer;
 
@@ -27,7 +27,7 @@ typedef struct {
  * \brief Initializes a frame buffer with space for \p size frames.
  * Returns the buffer or NULL in case of failure.
  */
-FrameBuffer *frame_buffer_new(size_t size);
+FrameBuffer *frame_buffer_new(void);
 
 void frame_buffer_flush_to_file(FrameBuffer *buf, WLOCKED FILE *file);
 bool frame_buffer_is_full(const FrameBuffer *buf);

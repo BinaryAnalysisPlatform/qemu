@@ -87,15 +87,13 @@ static bool std_frame_add_operand(StdFrame *std_frame, OperandInfo *oi) {
   return true;
 }
 
-FrameBuffer *frame_buffer_new(size_t size) {
+FrameBuffer *frame_buffer_new(void) {
   FrameBuffer *fb = g_malloc0(sizeof(FrameBuffer));
-  fb->fbuf = g_malloc0(sizeof(Frame *) * size);
-  fb->max_size = size;
   return fb;
 }
 
 bool frame_buffer_is_full(const FrameBuffer *buf) {
-  return buf->idx + 1 >= buf->max_size;
+  return buf->idx + 1 >= frames_per_toc_entry;
 }
 
 void frame_buffer_close_frame(FrameBuffer *buf) {
@@ -162,7 +160,7 @@ bool frame_buffer_is_empty(const FrameBuffer *buf) {
 }
 
 void frame_buffer_flush_to_file(FrameBuffer *buf, WLOCKED FILE *file) {
-  for (size_t i = 0; i <= buf->idx && i < buf->max_size; ++i) {
+  for (size_t i = 0; i <= buf->idx && i < frames_per_toc_entry; ++i) {
     Frame *frame = buf->fbuf[i];
     size_t msg_size = frame__get_packed_size(frame);
     uint8_t *packed_buffer = g_alloca(msg_size);
@@ -172,7 +170,7 @@ void frame_buffer_flush_to_file(FrameBuffer *buf, WLOCKED FILE *file) {
     buf->frames_written++;
     frame_free(frame);
   }
-  memset(buf->fbuf, 0, sizeof(Frame *) * buf->max_size);
+  memset(buf->fbuf, 0, sizeof(buf->fbuf));
   buf->idx = 0;
   // toc_update(); ??
 }

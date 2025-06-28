@@ -152,7 +152,7 @@ static void vcpu_init(qemu_plugin_id_t id, unsigned int vcpu_index) {
   }
   g_ptr_array_insert(state.vcpus, vcpu_index, vcpu);
 
-  FrameBuffer *vcpu_frame_buffer = frame_buffer_new(FRAME_BUFFER_SIZE_DEFAULT);
+  FrameBuffer *vcpu_frame_buffer = frame_buffer_new();
   g_ptr_array_insert(state.frame_buffer, vcpu_index, vcpu_frame_buffer);
 
   g_rw_lock_writer_unlock(&state.frame_buffer_lock);
@@ -208,14 +208,14 @@ static bool write_header(FILE *file, const char *target_name) {
     qemu_plugin_outs("Failed to get arch/mach.\n");
     return false;
   }
-  uint64_t num_frames = 0ULL;
-  uint64_t toc_off = 0ULL;
+  uint64_t num_toc_entries = 0ULL;
+  uint64_t toc_index_offset = 0ULL;
   WRITE(magic_number);
-  WRITE(out_trace_version);
+  WRITE(trace_version);
   WRITE(frame_arch);
   WRITE(frame_mach);
-  WRITE(num_frames);
-  WRITE(toc_off);
+  WRITE(num_toc_entries);  // Gets updated later
+  WRITE(toc_index_offset); // Gets updated later
   return true;
 }
 
