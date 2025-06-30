@@ -22,6 +22,18 @@ cd build
 make
 ```
 
+## Tracing a binary
+
+The plugin takes two required arguments:
+
+`bin_path`: The path to the binary emulated. Due to a [QEMU bug](https://gitlab.com/qemu-project/qemu/-/issues/3014) this cannot be inferred.
+`out`: The output file to save the trace into.
+
+```bash
+./qemu-sparc64 -plugin file=./contrib/plugins/bap-tracing/libbap_tracing.so,bin_path=<bin_path>,out=<output-file> -d plugin <bin_path>
+ls <output-file>
+```
+
 ## Trace format
 
 The generated trace consists of three parts: the header,

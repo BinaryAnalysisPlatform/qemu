@@ -271,6 +271,7 @@ static size_t mval_type_to_int(enum qemu_plugin_mem_value_type type) {
   default:
     g_assert(false);
   }
+  return 0;
 }
 
 static void mval_to_buf(qemu_plugin_mem_value *val, uint8_t *buf) {
