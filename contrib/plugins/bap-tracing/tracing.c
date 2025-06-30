@@ -3,6 +3,7 @@
 
 #include <glib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "frame_arch.h"
 #include "frame_buffer.h"
@@ -230,6 +231,7 @@ static void plugin_exit(qemu_plugin_id_t id, void *udata) {
   g_rw_lock_reader_unlock(&state.total_num_frames_lock);
   g_rw_lock_reader_unlock(&state.toc_entries_offsets_lock);
   g_rw_lock_writer_unlock(&state.file_lock);
+  qemu_plugin_outs("Finished trace\n");
 }
 
 static bool get_frame_arch_mach(const char *target_name, uint64_t *arch,
@@ -271,24 +273,28 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
   qemu_plugin_outs("Target name: ");
   qemu_plugin_outs(info->target_name);
   qemu_plugin_outs("\n");
+  char *output = get_argv_val(argv, argc, "out");
+  if (!output) {
+    qemu_plugin_outs("'out' argument is missing.\n");
+    qemu_plugin_outs("This is required.\n");
+    qemu_plugin_outs("Pass it with 'out=<output_file>'.\n\n");
+    exit(1);
+  }
 
-  const char *target_path = "/tmp/test.trace";
   state.frame_buffer = g_ptr_array_new();
   state.toc_entries_offsets = g_array_new(false, true, sizeof(uint64_t));
   state.vcpus = g_ptr_array_new();
-  state.file = fopen(target_path, "wb");
+  state.file = fopen(output, "wb");
   if (!(state.frame_buffer || state.vcpus || state.file ||
         !state.toc_entries_offsets)) {
     return 1;
   }
-  for (size_t i = 0; i < argc; ++i) {
-    qemu_plugin_outs(argv[i]);
-  }
+  g_free(output);
   if (!write_header(state.file, info->target_name)) {
     qemu_plugin_outs("Failed to header.\n");
     return 1;
   }
-  // write_meta(argv, envp, target_argv, target_envp);
+  write_meta(state.file, argv, argc);
 
   g_array_append_val(state.toc_entries_offsets, offset_toc_start);
 

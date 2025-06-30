@@ -5,6 +5,7 @@
 #define BAP_TRACE_META_H
 
 #include <err.h>
+#include <stdio.h>
 
 /**
  * \brief Empty macros indicate the argument, variable etc.
@@ -29,5 +30,9 @@
     if (fseek(file, (off), SEEK_SET) < 0)                                      \
       err(1, "stream not seekable");                                           \
   } while (0)
+
+void write_meta(WLOCKED FILE *file, char **plugin_argv, size_t plugin_argc);
+char *get_argv_val(char **argv, int argc, const char *key);
+void file_exists_exit(const char *file);
 
 #endif

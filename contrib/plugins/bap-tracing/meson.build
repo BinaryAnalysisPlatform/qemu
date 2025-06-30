@@ -41,6 +41,7 @@ dep_libprotobuf = declare_dependency(
 bap_tracing_src = files(
   'frame_buffer.c',
   'tracing.c',
+  'trace_meta.c',
 )
 
 if host_os == 'windows'

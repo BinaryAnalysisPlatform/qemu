@@ -1,6 +1,7 @@
 #ifndef BAP_TRACE_CONSTS_H
 #define BAP_TRACE_CONSTS_H
 
+#include "qemu-version.h"
 #include <stdint.h>
 
 // Trace header constants
@@ -17,6 +18,9 @@ static const uint64_t offset_toc_start = 48LL;
 static const uint64_t offset_first_frame = 48LL;
 
 static const uint64_t trace_version = 3LL;
+
+#define TRACER_NAME "qemu"
+#define TRACER_VERSION "plugin " QEMU_FULL_VERSION
 
 #define FRAMES_PER_TOC_ENTRY_ 64LL
 static const uint64_t frames_per_toc_entry = FRAMES_PER_TOC_ENTRY_;

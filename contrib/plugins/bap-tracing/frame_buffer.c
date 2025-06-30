@@ -98,9 +98,9 @@ bool frame_buffer_is_full(const FrameBuffer *buf) {
 
 void frame_buffer_close_frame(FrameBuffer *buf) {
   char *str = frame_buffer_as_str(buf);
-  qemu_plugin_outs("Close frame: ");
-  qemu_plugin_outs(str);
-  qemu_plugin_outs("\n\n");
+  // qemu_plugin_outs("Close frame: ");
+  // qemu_plugin_outs(str);
+  // qemu_plugin_outs("\n\n");
   g_free(str);
   buf->idx++;
 }
