@@ -135,7 +135,9 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
 
   // Open new one.
   Instruction *insn = udata;
-  add_new_insn_frame(vcpu, vcpu_index, fbuf, insn);
+  if (!add_new_insn_frame(vcpu, vcpu_index, fbuf, insn)) {
+    err(1, "Failed to add new frame.\n");
+  }
   add_pre_reg_state(vcpu, vcpu_index, current_regs, fbuf);
 
   g_rw_lock_writer_unlock(&state.frame_buffer_lock);

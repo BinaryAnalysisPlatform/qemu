@@ -4,7 +4,8 @@
 #include "frame_buffer.h"
 #include "trace_meta.h"
 
-static Frame *frame_new_std(uint64_t addr, int vcpu_id) {
+static Frame *frame_new_std(uint64_t addr, int vcpu_id, uint8_t *bytes,
+                            size_t bytes_len) {
   Frame *frame = g_new(Frame, 1);
   frame__init(frame);
 
@@ -14,6 +15,9 @@ static Frame *frame_new_std(uint64_t addr, int vcpu_id) {
 
   sframe->address = addr;
   sframe->thread_id = vcpu_id;
+  sframe->rawbytes.len = bytes_len;
+  sframe->rawbytes.data = g_malloc(bytes_len);
+  memcpy(sframe->rawbytes.data, bytes, bytes_len);
 
   OperandValueList *ol_in = g_new(OperandValueList, 1);
   operand_value_list__init(ol_in);
@@ -183,29 +187,10 @@ bool frame_buffer_new_frame_std(FrameBuffer *buf, unsigned int thread_id,
   if (frame_buffer_is_full(buf)) {
     return false;
   }
-  Frame *frame = frame_new_std(0, -1);
-  frame__init(frame);
-
-  StdFrame *stdframe = g_new(StdFrame, 1);
-  std_frame__init(stdframe);
-  frame->std_frame = stdframe;
-
-  stdframe->thread_id = thread_id;
-  stdframe->address = vaddr;
-  stdframe->rawbytes.len = bytes_len;
-  stdframe->rawbytes.data = g_malloc(bytes_len);
-  memcpy(stdframe->rawbytes.data, bytes, bytes_len);
-
-  OperandValueList *ol_in = g_new(OperandValueList, 1);
-  operand_value_list__init(ol_in);
-  ol_in->n_elem = 0;
-  stdframe->operand_pre_list = ol_in;
-
-  OperandValueList *ol_out = g_new(OperandValueList, 1);
-  operand_value_list__init(ol_out);
-  ol_out->n_elem = 0;
-  stdframe->operand_post_list = ol_out;
-
+  Frame *frame = frame_new_std(vaddr, thread_id, bytes, bytes_len);
+  if (!frame) {
+    return false;
+  }
   buf->fbuf[buf->idx] = frame;
   return true;
 }
