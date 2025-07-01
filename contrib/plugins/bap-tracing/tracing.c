@@ -199,6 +199,7 @@ static void cb_trans(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
 
 static void plugin_exit(qemu_plugin_id_t id, void *udata) {
   g_rw_lock_writer_lock(&state.frame_buffer_lock);
+  // Dump the rest of the frames.
   for (size_t i = 0; i < state.vcpus->len; ++i) {
     FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, i);
     write_toc_entry(fbuf);
@@ -223,7 +224,14 @@ static void plugin_exit(qemu_plugin_id_t id, void *udata) {
   uint64_t m = state.toc_entries_offsets->len;
   WRITE(m);
 
-  for (size_t i = 0; i < m; ++i) {
+  for (size_t i = 0; i < m - 1; ++i) {
+    // All except the last address in state.toc_entries_offsets
+    // point to an entry. The last one points to nothing, because
+    // we first push the offset and then push the frames later
+    // when the buffer is full.
+    // When we dumped the last frames above it lastly
+    // pushed an additional offset.
+    // This one we skip here with m - 1.
     uint64_t toc_entry_off =
         g_array_index(state.toc_entries_offsets, uint64_t, i);
     WRITE(toc_entry_off);
