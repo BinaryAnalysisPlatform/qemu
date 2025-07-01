@@ -97,7 +97,7 @@ FrameBuffer *frame_buffer_new(void) {
 }
 
 bool frame_buffer_is_full(const FrameBuffer *buf) {
-  return buf->idx + 1 >= frames_per_toc_entry;
+  return buf->idx >= frames_per_toc_entry;
 }
 
 void frame_buffer_close_frame(FrameBuffer *buf) {
