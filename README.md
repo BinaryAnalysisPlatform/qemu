@@ -3,8 +3,21 @@
 This QEMU fork implements the TCG plugin to generate execution traces in the
 [bap-frame](https://github.com/BinaryAnalysisPlatform/bap-frames) format.
 
+This plugin does not yet support all targets.
+If not listed below it is untested.
+
+Known to work:
+
+- Sparc
+- Hexagon
+- PPC
+
+Needs fixes:
+
+- ARM (cannot get current mode of VCPU if target can switch between ARM/Thumb).
+
 Previous traces were generated with a patched QEMU.
-You can find these in the branches tracewrap-6.2.0 for ARM and x86 and tracewrap-8.1 for Hexagon.
+You can find these in tracewrap-* branches.
 
 ## Dependencies
 

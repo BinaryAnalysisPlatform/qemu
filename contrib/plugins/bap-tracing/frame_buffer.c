@@ -4,8 +4,8 @@
 #include "frame_buffer.h"
 #include "trace_meta.h"
 
-static Frame *frame_new_std(uint64_t addr, int vcpu_id, uint8_t *bytes,
-                            size_t bytes_len) {
+static Frame *frame_new_std(uint64_t addr, int vcpu_id, const char *mode_id,
+                            uint8_t *bytes, size_t bytes_len) {
   Frame *frame = g_new(Frame, 1);
   frame__init(frame);
 
@@ -14,6 +14,9 @@ static Frame *frame_new_std(uint64_t addr, int vcpu_id, uint8_t *bytes,
   frame->std_frame = sframe;
 
   sframe->address = addr;
+  if (mode_id) {
+    sframe->mode = g_strdup(mode_id);
+  }
   sframe->thread_id = vcpu_id;
   sframe->rawbytes.len = bytes_len;
   sframe->rawbytes.data = g_malloc(bytes_len);
@@ -190,12 +193,12 @@ uint64_t frame_buffer_flush_to_file(FrameBuffer *buf, WLOCKED FILE *file, bool a
 }
 
 bool frame_buffer_new_frame_std(FrameBuffer *buf, unsigned int thread_id,
-                                uint64_t vaddr, uint8_t *bytes,
-                                size_t bytes_len) {
+                                uint64_t vaddr, const char *mode,
+                                uint8_t *bytes, size_t bytes_len) {
   if (frame_buffer_is_full(buf)) {
     return false;
   }
-  Frame *frame = frame_new_std(vaddr, thread_id, bytes, bytes_len);
+  Frame *frame = frame_new_std(vaddr, thread_id, mode, bytes, bytes_len);
   if (!frame) {
     return false;
   }

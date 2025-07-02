@@ -76,12 +76,6 @@ static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
   }
 }
 
-static bool add_new_insn_frame(VCPU *vcpu, unsigned int vcpu_index,
-                               FrameBuffer *fbuf, Instruction *insn) {
-  return frame_buffer_new_frame_std(fbuf, vcpu_index, insn->vaddr, insn->bytes,
-                                    insn->size);
-}
-
 static GPtrArray *registers_init(void) {
   GArray *reg_list = qemu_plugin_get_registers();
 
@@ -105,7 +99,8 @@ static void write_toc_entry(FrameBuffer *fbuf, bool add_padding) {
   g_rw_lock_writer_lock(&state.toc_entries_offsets_lock);
   g_rw_lock_writer_lock(&state.total_num_frames_lock);
 
-  state.total_num_frames += frame_buffer_flush_to_file(fbuf, state.file, add_padding);
+  state.total_num_frames +=
+      frame_buffer_flush_to_file(fbuf, state.file, add_padding);
   uint64_t next_toc_entry = ftell(state.file);
   g_array_append_val(state.toc_entries_offsets, next_toc_entry);
 
@@ -135,9 +130,15 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
 
   // Open new one.
   Instruction *insn = udata;
-  if (!add_new_insn_frame(vcpu, vcpu_index, fbuf, insn)) {
+  g_rw_lock_reader_lock(&state.vcpu_mode_lock);
+  if (!frame_buffer_new_frame_std(
+          fbuf, vcpu_index, insn->vaddr,
+          g_ptr_array_index(state.vcpu_modes, vcpu_index), insn->bytes,
+          insn->size)) {
     err(1, "Failed to add new frame.\n");
   }
+  g_rw_lock_reader_unlock(&state.vcpu_mode_lock);
+
   add_pre_reg_state(vcpu, vcpu_index, current_regs, fbuf);
 
   g_rw_lock_writer_unlock(&state.frame_buffer_lock);
@@ -161,6 +162,7 @@ Register *init_vcpu_register(qemu_plugin_reg_descriptor *desc) {
 static void vcpu_init(qemu_plugin_id_t id, unsigned int vcpu_index) {
   g_rw_lock_writer_lock(&state.vcpus_array_lock);
   g_rw_lock_writer_lock(&state.frame_buffer_lock);
+  g_rw_lock_writer_lock(&state.vcpu_mode_lock);
 
   VCPU *vcpu = g_malloc0(sizeof(VCPU));
   vcpu->registers = registers_init();
@@ -170,6 +172,22 @@ static void vcpu_init(qemu_plugin_id_t id, unsigned int vcpu_index) {
   FrameBuffer *vcpu_frame_buffer = frame_buffer_new();
   g_ptr_array_insert(state.frame_buffer, vcpu_index, vcpu_frame_buffer);
 
+  uint64_t frame_arch = 0;
+  uint64_t frame_mach = 0;
+  if (!get_frame_arch_mach(state.target_name, &frame_arch, &frame_mach)) {
+    qemu_plugin_outs("Failed to get arch/mach.\n");
+  }
+  const char *mode = FRAME_MODE_NONE;
+  if (frame_arch == frame_arch_powerpc && frame_mach == frame_mach_ppc64) {
+    mode = FRAME_MODE_PPC64;
+  } else if (frame_arch == frame_arch_powerpc && frame_mach == frame_mach_ppc) {
+    mode = FRAME_MODE_PPC32;
+  }
+  // TODO: handle ARM
+  g_ptr_array_insert(state.vcpu_modes, vcpu_index,
+                     mode ? g_strdup(mode) : NULL);
+
+  g_rw_lock_writer_unlock(&state.vcpu_mode_lock);
   g_rw_lock_writer_unlock(&state.frame_buffer_lock);
   g_rw_lock_writer_unlock(&state.vcpus_array_lock);
 }
@@ -238,21 +256,6 @@ static void plugin_exit(qemu_plugin_id_t id, void *udata) {
   qemu_plugin_outs("Finished trace\n");
 }
 
-static bool get_frame_arch_mach(const char *target_name, uint64_t *arch,
-                                uint64_t *mach) {
-  *mach = 0;
-  *arch = frame_arch_last;
-  const char *aname = arch_map[0].name;
-  for (size_t i = 0; arch_map[i].name; ++i) {
-    aname = arch_map[i].name;
-    if (!strncmp(aname, target_name, strlen(aname))) {
-      *arch = arch_map[i].val;
-      break;
-    }
-  }
-  return *arch != frame_arch_last;
-}
-
 static bool write_header(FILE *file, const char *target_name) {
   uint64_t frame_arch = 0;
   uint64_t frame_mach = 0;
@@ -285,9 +288,11 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
     exit(1);
   }
 
+  state.target_name = g_strdup(info->target_name);
   state.frame_buffer = g_ptr_array_new();
   state.toc_entries_offsets = g_array_new(false, true, sizeof(uint64_t));
   state.vcpus = g_ptr_array_new();
+  state.vcpu_modes = g_ptr_array_new();
   state.file = fopen(output, "wb");
   if (!(state.frame_buffer || state.vcpus || state.file ||
         !state.toc_entries_offsets)) {

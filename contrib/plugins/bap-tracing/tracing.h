@@ -15,94 +15,112 @@
 
 struct arch_enum_entry {
   const char *name;
-  enum frame_architecture val;
+  enum frame_architecture arch;
+  size_t machine;
 };
 
 static struct arch_enum_entry arch_map[] = {
-    {.name = "unknown", .val = frame_arch_unknown},
-    {.name = "obscure", .val = frame_arch_obscure},
-    {.name = "m68k", .val = frame_arch_m68k},
-    {.name = "vax", .val = frame_arch_vax},
-    {.name = "i960", .val = frame_arch_i960},
-    {.name = "or32", .val = frame_arch_or32},
-    {.name = "sparc", .val = frame_arch_sparc},
-    {.name = "spu", .val = frame_arch_spu},
-    {.name = "mips", .val = frame_arch_mips},
-    {.name = "i386", .val = frame_arch_i386},
-    {.name = "l1om", .val = frame_arch_l1om},
-    {.name = "we32k", .val = frame_arch_we32k},
-    {.name = "tahoe", .val = frame_arch_tahoe},
-    {.name = "i860", .val = frame_arch_i860},
-    {.name = "i370", .val = frame_arch_i370},
-    {.name = "romp", .val = frame_arch_romp},
-    {.name = "convex", .val = frame_arch_convex},
-    {.name = "m88k", .val = frame_arch_m88k},
-    {.name = "m98k", .val = frame_arch_m98k},
-    {.name = "pyramid", .val = frame_arch_pyramid},
-    {.name = "h8300", .val = frame_arch_h8300},
-    {.name = "pdp11", .val = frame_arch_pdp11},
-    {.name = "plugin", .val = frame_arch_plugin},
-    {.name = "powerpc", .val = frame_arch_powerpc},
-    {.name = "rs6000", .val = frame_arch_rs6000},
-    {.name = "hppa", .val = frame_arch_hppa},
-    {.name = "d10v", .val = frame_arch_d10v},
-    {.name = "d30v", .val = frame_arch_d30v},
-    {.name = "dlx", .val = frame_arch_dlx},
-    {.name = "m68hc11", .val = frame_arch_m68hc11},
-    {.name = "m68hc12", .val = frame_arch_m68hc12},
-    {.name = "z8k", .val = frame_arch_z8k},
-    {.name = "h8500", .val = frame_arch_h8500},
-    {.name = "sh", .val = frame_arch_sh},
-    {.name = "alpha", .val = frame_arch_alpha},
-    {.name = "arm", .val = frame_arch_arm},
-    {.name = "ns32k", .val = frame_arch_ns32k},
-    {.name = "w65", .val = frame_arch_w65},
-    {.name = "tic30", .val = frame_arch_tic30},
-    {.name = "tic4x", .val = frame_arch_tic4x},
-    {.name = "tic54x", .val = frame_arch_tic54x},
-    {.name = "tic6x", .val = frame_arch_tic6x},
-    {.name = "tic80", .val = frame_arch_tic80},
-    {.name = "v850", .val = frame_arch_v850},
-    {.name = "arc", .val = frame_arch_arc},
-    {.name = "m32c", .val = frame_arch_m32c},
-    {.name = "m32r", .val = frame_arch_m32r},
-    {.name = "mn10200", .val = frame_arch_mn10200},
-    {.name = "mn10300", .val = frame_arch_mn10300},
-    {.name = "fr30", .val = frame_arch_fr30},
-    {.name = "frv", .val = frame_arch_frv},
-    {.name = "moxie", .val = frame_arch_moxie},
-    {.name = "mcore", .val = frame_arch_mcore},
-    {.name = "mep", .val = frame_arch_mep},
-    {.name = "ia64", .val = frame_arch_ia64},
-    {.name = "ip2k", .val = frame_arch_ip2k},
-    {.name = "iq2000", .val = frame_arch_iq2000},
-    {.name = "mt", .val = frame_arch_mt},
-    {.name = "pj", .val = frame_arch_pj},
-    {.name = "avr", .val = frame_arch_avr},
-    {.name = "bfin", .val = frame_arch_bfin},
-    {.name = "cr16", .val = frame_arch_cr16},
-    {.name = "cr16c", .val = frame_arch_cr16c},
-    {.name = "crx", .val = frame_arch_crx},
-    {.name = "cris", .val = frame_arch_cris},
-    {.name = "rx", .val = frame_arch_rx},
-    {.name = "s390", .val = frame_arch_s390},
-    {.name = "score", .val = frame_arch_score},
-    {.name = "openrisc", .val = frame_arch_openrisc},
-    {.name = "mmix", .val = frame_arch_mmix},
-    {.name = "xstormy16", .val = frame_arch_xstormy16},
-    {.name = "msp430", .val = frame_arch_msp430},
-    {.name = "xc16x", .val = frame_arch_xc16x},
-    {.name = "xtensa", .val = frame_arch_xtensa},
-    {.name = "z80", .val = frame_arch_z80},
-    {.name = "lm32", .val = frame_arch_lm32},
-    {.name = "microblaze", .val = frame_arch_microblaze},
-    {.name = "6502", .val = frame_arch_6502},
-    {.name = "aarch64", .val = frame_arch_aarch64},
-    {.name = "8051", .val = frame_arch_8051},
-    {.name = "sm83", .val = frame_arch_sm83},
-    {.name = "hexagon", .val = frame_arch_hexagon},
-    {.name = NULL, .val = frame_arch_last},
+    {.name = "unknown", .arch = frame_arch_unknown, .machine = 0},
+    {.name = "obscure", .arch = frame_arch_obscure, .machine = 0},
+    {.name = "m68k", .arch = frame_arch_m68k, .machine = 0},
+    {.name = "vax", .arch = frame_arch_vax, .machine = 0},
+    {.name = "i960", .arch = frame_arch_i960, .machine = 0},
+    {.name = "or32", .arch = frame_arch_or32, .machine = 0},
+    {.name = "sparc", .arch = frame_arch_sparc, .machine = 0},
+    {.name = "spu", .arch = frame_arch_spu, .machine = 0},
+    {.name = "mips", .arch = frame_arch_mips, .machine = 0},
+    {.name = "i386", .arch = frame_arch_i386, .machine = 0},
+    {.name = "l1om", .arch = frame_arch_l1om, .machine = 0},
+    {.name = "we32k", .arch = frame_arch_we32k, .machine = 0},
+    {.name = "tahoe", .arch = frame_arch_tahoe, .machine = 0},
+    {.name = "i860", .arch = frame_arch_i860, .machine = 0},
+    {.name = "i370", .arch = frame_arch_i370, .machine = 0},
+    {.name = "romp", .arch = frame_arch_romp, .machine = 0},
+    {.name = "convex", .arch = frame_arch_convex, .machine = 0},
+    {.name = "m88k", .arch = frame_arch_m88k, .machine = 0},
+    {.name = "m98k", .arch = frame_arch_m98k, .machine = 0},
+    {.name = "pyramid", .arch = frame_arch_pyramid, .machine = 0},
+    {.name = "h8300", .arch = frame_arch_h8300, .machine = 0},
+    {.name = "pdp11", .arch = frame_arch_pdp11, .machine = 0},
+    {.name = "plugin", .arch = frame_arch_plugin, .machine = 0},
+    {.name = "ppc", .arch = frame_arch_powerpc, .machine = frame_mach_ppc},
+    {.name = "ppc64", .arch = frame_arch_powerpc, .machine = frame_mach_ppc64},
+    {.name = "rs6000", .arch = frame_arch_rs6000, .machine = 0},
+    {.name = "hppa", .arch = frame_arch_hppa, .machine = 0},
+    {.name = "d10v", .arch = frame_arch_d10v, .machine = 0},
+    {.name = "d30v", .arch = frame_arch_d30v, .machine = 0},
+    {.name = "dlx", .arch = frame_arch_dlx, .machine = 0},
+    {.name = "m68hc11", .arch = frame_arch_m68hc11, .machine = 0},
+    {.name = "m68hc12", .arch = frame_arch_m68hc12, .machine = 0},
+    {.name = "z8k", .arch = frame_arch_z8k, .machine = 0},
+    {.name = "h8500", .arch = frame_arch_h8500, .machine = 0},
+    {.name = "sh", .arch = frame_arch_sh, .machine = 0},
+    {.name = "alpha", .arch = frame_arch_alpha, .machine = 0},
+    {.name = "arm", .arch = frame_arch_arm, .machine = 0},
+    {.name = "ns32k", .arch = frame_arch_ns32k, .machine = 0},
+    {.name = "w65", .arch = frame_arch_w65, .machine = 0},
+    {.name = "tic30", .arch = frame_arch_tic30, .machine = 0},
+    {.name = "tic4x", .arch = frame_arch_tic4x, .machine = 0},
+    {.name = "tic54x", .arch = frame_arch_tic54x, .machine = 0},
+    {.name = "tic6x", .arch = frame_arch_tic6x, .machine = 0},
+    {.name = "tic80", .arch = frame_arch_tic80, .machine = 0},
+    {.name = "v850", .arch = frame_arch_v850, .machine = 0},
+    {.name = "arc", .arch = frame_arch_arc, .machine = 0},
+    {.name = "m32c", .arch = frame_arch_m32c, .machine = 0},
+    {.name = "m32r", .arch = frame_arch_m32r, .machine = 0},
+    {.name = "mn10200", .arch = frame_arch_mn10200, .machine = 0},
+    {.name = "mn10300", .arch = frame_arch_mn10300, .machine = 0},
+    {.name = "fr30", .arch = frame_arch_fr30, .machine = 0},
+    {.name = "frv", .arch = frame_arch_frv, .machine = 0},
+    {.name = "moxie", .arch = frame_arch_moxie, .machine = 0},
+    {.name = "mcore", .arch = frame_arch_mcore, .machine = 0},
+    {.name = "mep", .arch = frame_arch_mep, .machine = 0},
+    {.name = "ia64", .arch = frame_arch_ia64, .machine = 0},
+    {.name = "ip2k", .arch = frame_arch_ip2k, .machine = 0},
+    {.name = "iq2000", .arch = frame_arch_iq2000, .machine = 0},
+    {.name = "mt", .arch = frame_arch_mt, .machine = 0},
+    {.name = "pj", .arch = frame_arch_pj, .machine = 0},
+    {.name = "avr", .arch = frame_arch_avr, .machine = 0},
+    {.name = "bfin", .arch = frame_arch_bfin, .machine = 0},
+    {.name = "cr16", .arch = frame_arch_cr16, .machine = 0},
+    {.name = "cr16c", .arch = frame_arch_cr16c, .machine = 0},
+    {.name = "crx", .arch = frame_arch_crx, .machine = 0},
+    {.name = "cris", .arch = frame_arch_cris, .machine = 0},
+    {.name = "rx", .arch = frame_arch_rx, .machine = 0},
+    {.name = "s390", .arch = frame_arch_s390, .machine = 0},
+    {.name = "score", .arch = frame_arch_score, .machine = 0},
+    {.name = "openrisc", .arch = frame_arch_openrisc, .machine = 0},
+    {.name = "mmix", .arch = frame_arch_mmix, .machine = 0},
+    {.name = "xstormy16", .arch = frame_arch_xstormy16, .machine = 0},
+    {.name = "msp430", .arch = frame_arch_msp430, .machine = 0},
+    {.name = "xc16x", .arch = frame_arch_xc16x, .machine = 0},
+    {.name = "xtensa", .arch = frame_arch_xtensa, .machine = 0},
+    {.name = "z80", .arch = frame_arch_z80, .machine = 0},
+    {.name = "lm32", .arch = frame_arch_lm32, .machine = 0},
+    {.name = "microblaze", .arch = frame_arch_microblaze, .machine = 0},
+    {.name = "6502", .arch = frame_arch_6502, .machine = 0},
+    {.name = "aarch64", .arch = frame_arch_aarch64, .machine = 0},
+    {.name = "8051", .arch = frame_arch_8051, .machine = 0},
+    {.name = "sm83", .arch = frame_arch_sm83, .machine = 0},
+    {.name = "hexagon", .arch = frame_arch_hexagon, .machine = 0},
+    {.name = NULL, .arch = frame_arch_last, .machine = 0},
 };
+
+static inline bool get_frame_arch_mach(const char *target_name, uint64_t *arch,
+                                       uint64_t *mach) {
+  *mach = 0;
+  *arch = frame_arch_last;
+  const char *aname = arch_map[0].name;
+  for (size_t i = 0; arch_map[i].name; ++i) {
+    aname = arch_map[i].name;
+    if (!strncmp(aname, target_name, strlen(aname))) {
+      *arch = arch_map[i].arch;
+      *mach = arch_map[i].machine;
+      break;
+    }
+  }
+  return *arch != frame_arch_last;
+}
 
 QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
 
@@ -142,6 +160,11 @@ typedef struct {
 
   GRWLock file_lock;
   FILE *file;
+
+  GRWLock vcpu_mode_lock;
+  GPtrArray /*<const char *>*/ *vcpu_modes; ///< Indexed by vcpu id.
+
+  const char *target_name;
 } TraceState;
 
 VCPU *vcpu_new(void);

@@ -35,8 +35,8 @@ void frame_buffer_close_frame(FrameBuffer *buf);
 char *frame_buffer_as_str(const FrameBuffer *buf);
 
 bool frame_buffer_new_frame_std(FrameBuffer *buf, unsigned int thread_id,
-                                uint64_t vaddr, uint8_t *bytes,
-                                size_t bytes_len);
+                                uint64_t vaddr, const char *mode_id,
+                                uint8_t *bytes, size_t bytes_len);
 
 bool frame_buffer_append_mem_info(FrameBuffer *fbuf, uint64_t vaddr,
                                   qemu_plugin_mem_value *mval, bool is_store);
