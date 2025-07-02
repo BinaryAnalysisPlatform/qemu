@@ -221,17 +221,11 @@ static void plugin_exit(qemu_plugin_id_t id, void *udata) {
 
   // Write the TOC index
   SEEK(toc_index_offset);
-  uint64_t m = state.toc_entries_offsets->len;
-  WRITE(m);
+  WRITE(frames_per_toc_entry);
+  size_t add = state.total_num_frames % frames_per_toc_entry != 0 ? 1 : 0;
+  size_t entries = ((state.total_num_frames) / frames_per_toc_entry) + add;
 
-  for (size_t i = 0; i < m - 1; ++i) {
-    // All except the last address in state.toc_entries_offsets
-    // point to an entry. The last one points to nothing, because
-    // we first push the offset and then push the frames later
-    // when the buffer is full.
-    // When we dumped the last frames above it lastly
-    // pushed an additional offset.
-    // This one we skip here with m - 1.
+  for (size_t i = 0; i < entries; ++i) {
     uint64_t toc_entry_off =
         g_array_index(state.toc_entries_offsets, uint64_t, i);
     WRITE(toc_entry_off);

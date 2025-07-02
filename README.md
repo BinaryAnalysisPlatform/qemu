@@ -65,8 +65,8 @@ the BAP-frames repository.
 |    ...     | ...          | ... | |
 |    T-0x10  | uint64_t     | sizeof(frame_n-1) | |
 |    T-0x8   | type(frame_n-1) | frame_n-1 | |
-|    T+0     | uint64_t     | m = number of TOC entries | TOC index begin |
+|    T+0     | uint64_t     | m = number of frames per TOC entry | TOC index begin |
 |    T+0x8   | uint64_t     | offset toc_entry(0) | |
 |    T+0x10  | uint64_t     | offset toc_entry(1) | |
 |    ...     | ...          | ... | |
-|    T+0x8+(0x8*m)   | uint64_t     | offset toc_entry(m-1) | |
+|    T+0x8+(0x8*ceil(n/m))   | uint64_t     | offset toc_entry(ceil(n/m)) | |
