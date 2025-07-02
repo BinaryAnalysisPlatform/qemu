@@ -113,7 +113,7 @@ static inline bool get_frame_arch_mach(const char *target_name, uint64_t *arch,
   const char *aname = arch_map[0].name;
   for (size_t i = 0; arch_map[i].name; ++i) {
     aname = arch_map[i].name;
-    if (!strncmp(aname, target_name, strlen(aname))) {
+    if (!strcmp(aname, target_name)) {
       *arch = arch_map[i].arch;
       *mach = arch_map[i].machine;
       break;
