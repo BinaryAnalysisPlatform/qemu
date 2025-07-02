@@ -300,7 +300,7 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
   }
   g_free(output);
   if (!write_header(state.file, info->target_name)) {
-    qemu_plugin_outs("Failed to header.\n");
+    qemu_plugin_outs("Failed to write header.\n");
     return 1;
   }
   write_meta(state.file, argv, argc);
