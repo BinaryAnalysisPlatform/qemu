@@ -26,7 +26,8 @@ static struct arch_enum_entry arch_map[] = {
     {.name = "vax", .arch = frame_arch_vax, .machine = 0},
     {.name = "i960", .arch = frame_arch_i960, .machine = 0},
     {.name = "or32", .arch = frame_arch_or32, .machine = 0},
-    {.name = "sparc", .arch = frame_arch_sparc, .machine = 0},
+    {.name = "sparc", .arch = frame_arch_sparc, .machine = frame_mach_sparc_v8plusa},
+    {.name = "sparc64", .arch = frame_arch_sparc, .machine = frame_mach_sparc_v9b},
     {.name = "spu", .arch = frame_arch_spu, .machine = 0},
     {.name = "mips", .arch = frame_arch_mips, .machine = 0},
     {.name = "i386", .arch = frame_arch_i386, .machine = 0},
@@ -118,6 +119,11 @@ static inline bool get_frame_arch_mach(const char *target_name, uint64_t *arch,
       *mach = arch_map[i].machine;
       break;
     }
+  }
+  if (*arch == frame_arch_last) {
+    qemu_plugin_outs("Could not find frame_arch/mach value for target name: ");
+    qemu_plugin_outs(target_name);
+    qemu_plugin_outs("\nConsider adding it.\n");
   }
   return *arch != frame_arch_last;
 }
