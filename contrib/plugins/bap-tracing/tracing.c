@@ -54,6 +54,8 @@ static void add_post_reg_state(VCPU *vcpu, unsigned int vcpu_index,
     assert(s == prev_reg->content->len);
     if (!memcmp(rdata->data, prev_reg->content->data, s)) {
       // No change
+      // Flush byte array
+      g_byte_array_set_size(rdata, 0);
       continue;
     }
 
@@ -62,6 +64,8 @@ static void add_post_reg_state(VCPU *vcpu, unsigned int vcpu_index,
       qemu_plugin_outs("Failed to append opinfo.\n");
       return;
     }
+    // Flush byte array
+    g_byte_array_set_size(rdata, 0);
   }
 }
 
@@ -72,7 +76,12 @@ static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
     qemu_plugin_reg_descriptor *reg =
         &g_array_index(current_regs, qemu_plugin_reg_descriptor, i);
     size_t s = qemu_plugin_read_register(reg->handle, rdata);
+    Register *prev_reg = g_ptr_array_index(vcpu->registers, i);
+    g_assert(!strcmp(prev_reg->name, reg->name) && prev_reg->handle == reg->handle);
+    memcpy(prev_reg->content->data, rdata->data, prev_reg->content->len);
     frame_buffer_append_reg_info(fbuf, reg->name, rdata, s, OperandRead);
+    // Flush byte array
+    g_byte_array_set_size(rdata, 0);
   }
 }
 
