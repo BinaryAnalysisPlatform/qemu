@@ -166,29 +166,33 @@ bool frame_buffer_is_empty(const FrameBuffer *buf) {
   return buf->fbuf[buf->idx] == NULL;
 }
 
-/// @brief Dumps the file buffer as TOC entry into the file.
-uint64_t frame_buffer_flush_to_file(FrameBuffer *buf, WLOCKED FILE *file, bool add_padding) {
-  uint64_t n = 0;
-  for (size_t i = 0; i < frames_per_toc_entry; ++i) {
-    if (i <= buf->idx) {
-      Frame *frame = buf->fbuf[i];
-      size_t msg_size = frame__get_packed_size(frame);
-      uint8_t *packed_buffer = g_alloca(msg_size);
-      uint64_t packed_size = frame__pack(frame, packed_buffer);
-      WRITE(packed_size);
-      WRITE_BUF(packed_buffer, packed_size);
-      frame_free(frame);
-      n++;
-    } else if (add_padding) {
-      uint64_t pad = 0;
-      WRITE(pad);
-      n++;
-    } else {
-      break;
-    }
-  }
+void frame_buffer_clean(FrameBuffer *buf) {
   memset(buf->fbuf, 0, sizeof(buf->fbuf));
   buf->idx = 0;
+}
+
+bool frame_buffer_write_frame_to_file(FrameBuffer *buf, WLOCKED FILE *file, size_t i) {
+  if (i > buf->idx) {
+    return false;
+  }
+  Frame *frame = buf->fbuf[i];
+  size_t msg_size = frame__get_packed_size(frame);
+  uint8_t *packed_buffer = g_alloca(msg_size);
+  uint64_t packed_size = frame__pack(frame, packed_buffer);
+  WRITE(packed_size);
+  WRITE_BUF(packed_buffer, packed_size);
+  frame_free(frame);
+  return true;
+}
+
+/// @brief Dumps the file buffer as TOC entry into the file.
+uint64_t frame_buffer_flush_to_file(FrameBuffer *buf, WLOCKED FILE *file) {
+  uint64_t n = 0;
+  for (size_t i = 0; i < buf->idx; ++i) {
+    frame_buffer_write_frame_to_file(buf, file, i);
+    n++;
+  }
+  frame_buffer_clean(buf);
   return n;
 }
 

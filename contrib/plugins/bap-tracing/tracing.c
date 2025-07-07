@@ -77,7 +77,8 @@ static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
         &g_array_index(current_regs, qemu_plugin_reg_descriptor, i);
     size_t s = qemu_plugin_read_register(reg->handle, rdata);
     Register *prev_reg = g_ptr_array_index(vcpu->registers, i);
-    g_assert(!strcmp(prev_reg->name, reg->name) && prev_reg->handle == reg->handle);
+    g_assert(!strcmp(prev_reg->name, reg->name) &&
+             prev_reg->handle == reg->handle);
     memcpy(prev_reg->content->data, rdata->data, prev_reg->content->len);
     frame_buffer_append_reg_info(fbuf, reg->name, rdata, s, OperandRead);
     // Flush byte array
@@ -103,16 +104,63 @@ static GPtrArray *registers_init(void) {
   return registers->len ? g_steal_pointer(&registers) : NULL;
 }
 
-static void write_toc_entry(FrameBuffer *fbuf, bool add_padding) {
+static void flush_and_write_toc_entry(FrameBuffer *fbuf) {
   g_rw_lock_writer_lock(&state.file_lock);
   g_rw_lock_writer_lock(&state.toc_entries_offsets_lock);
   g_rw_lock_writer_lock(&state.total_num_frames_lock);
 
-  state.total_num_frames +=
-      frame_buffer_flush_to_file(fbuf, state.file, add_padding);
+  state.total_num_frames += frame_buffer_flush_to_file(fbuf, state.file);
   uint64_t next_toc_entry = ftell(state.file);
   g_array_append_val(state.toc_entries_offsets, next_toc_entry);
 
+  g_rw_lock_writer_unlock(&state.total_num_frames_lock);
+  g_rw_lock_writer_unlock(&state.toc_entries_offsets_lock);
+  g_rw_lock_writer_unlock(&state.file_lock);
+}
+
+static void flush_all_frame_bufs(void) {
+  g_rw_lock_writer_lock(&state.file_lock);
+  g_rw_lock_writer_lock(&state.toc_entries_offsets_lock);
+  g_rw_lock_writer_lock(&state.total_num_frames_lock);
+  g_rw_lock_writer_lock(&state.frame_buffer_lock);
+
+  FILE *file = state.file;
+
+  // Dump the rest of the frames but be mindeful about the
+  // maximum number of frames per TOC entry.
+
+  size_t total_to_write = 0;
+  for (size_t i = 0; i < state.vcpus->len; ++i) {
+    // Add post operands to last instructions.
+    FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, i);
+    VCPU *vcpu = g_ptr_array_index(state.vcpus, i);
+    g_assert(vcpu);
+    GArray *current_regs = qemu_plugin_get_registers();
+    g_assert(current_regs->len == vcpu->registers->len);
+    add_post_reg_state(vcpu, i, current_regs, fbuf);
+    frame_buffer_close_frame(fbuf);
+
+    total_to_write += fbuf->idx;
+  }
+
+  size_t entry_count = 0;
+  for (size_t i = 0; i < state.vcpus->len && total_to_write > 0; ++i) {
+    if (entry_count == frames_per_toc_entry) {
+      entry_count = 0;
+      uint64_t next_toc_entry = ftell(state.file);
+      g_array_append_val(state.toc_entries_offsets, next_toc_entry);
+    }
+
+    FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, i);
+    for (size_t k = 0; k < fbuf->idx; ++k) {
+      frame_buffer_write_frame_to_file(fbuf, file, k);
+      entry_count++;
+      state.total_num_frames++;
+      total_to_write--;
+    }
+  }
+
+  g_rw_lock_writer_unlock(&state.frame_buffer_lock);
   g_rw_lock_writer_unlock(&state.total_num_frames_lock);
   g_rw_lock_writer_unlock(&state.toc_entries_offsets_lock);
   g_rw_lock_writer_unlock(&state.file_lock);
@@ -134,7 +182,7 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   }
 
   if (frame_buffer_is_full(fbuf)) {
-    write_toc_entry(fbuf, false);
+    flush_and_write_toc_entry(fbuf);
   }
 
   // Open new one.
@@ -225,13 +273,7 @@ static void cb_trans(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
 }
 
 static void plugin_exit(qemu_plugin_id_t id, void *udata) {
-  g_rw_lock_writer_lock(&state.frame_buffer_lock);
-  // Dump the rest of the frames.
-  for (size_t i = 0; i < state.vcpus->len; ++i) {
-    FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, i);
-    write_toc_entry(fbuf, true);
-  }
-  g_rw_lock_writer_unlock(&state.frame_buffer_lock);
+  flush_all_frame_bufs();
 
   g_rw_lock_writer_lock(&state.file_lock);
   g_rw_lock_reader_lock(&state.toc_entries_offsets_lock);
