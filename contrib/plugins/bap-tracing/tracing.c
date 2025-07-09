@@ -81,7 +81,8 @@ static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
     Register *prev_reg = g_ptr_array_index(vcpu->registers, i);
     g_assert(!strcmp(prev_reg->name, reg->name) &&
              prev_reg->handle == reg->handle);
-    memcpy_le(prev_reg->content->data, rdata->data, prev_reg->content->len, state.is_big_endian);
+    memcpy_le(prev_reg->content->data, rdata->data, prev_reg->content->len,
+              state.is_big_endian);
     frame_buffer_append_reg_info(fbuf, reg->name, rdata, s, OperandRead);
     // Flush byte array
     g_byte_array_set_size(rdata, 0);

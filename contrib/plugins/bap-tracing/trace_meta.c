@@ -178,7 +178,7 @@ void write_meta(WLOCKED FILE *file, char **plugin_argv, size_t plugin_argc) {
   // I don't know why, but ASAN crashes at this line if the WRITE_BUF macro
   // is used. Although it should be the exact same code.
   if (fwrite((packed_buffer), 1, (packed_size), file) != packed_size) {
-   err(1, "fwrite failed");
+    err(1, "fwrite failed");
   }
 
   g_free(packed_buffer);

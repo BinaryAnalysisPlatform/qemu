@@ -171,7 +171,8 @@ void frame_buffer_clean(FrameBuffer *buf) {
   buf->idx = 0;
 }
 
-bool frame_buffer_write_frame_to_file(FrameBuffer *buf, WLOCKED FILE *file, size_t i) {
+bool frame_buffer_write_frame_to_file(FrameBuffer *buf, WLOCKED FILE *file,
+                                      size_t i) {
   if (i > buf->idx) {
     return false;
   }
