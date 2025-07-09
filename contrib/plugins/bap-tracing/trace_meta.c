@@ -191,3 +191,25 @@ void write_meta(WLOCKED FILE *file, char **plugin_argv, size_t plugin_argc) {
   g_free(host);
   g_free(arg_bin_path);
 }
+
+/// Copies src to dst. dst will always be in little endian byte order.
+void memcpy_le(uint8_t *dst, uint8_t *src, size_t len, bool big_endian) {
+  if (!big_endian) {
+    memcpy(dst, src, len);
+    return;
+  }
+  for (size_t k = 0; k < len; ++k) {
+    dst[k] = src[len - 1 - k];
+  }
+}
+
+void swap_to_le(uint8_t *buf, size_t len, bool big_endian) {
+  if (!big_endian || len == 1) {
+    return;
+  }
+  for (size_t k = 0; k < len / 2; ++k) {
+    uint8_t tmp = buf[k];
+    buf[k] = buf[len - 1 - k];
+    buf[len - 1 - k] = tmp;
+  }
+}
