@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "compiler.h"
 #include "frame_arch.h"
 #include "frame_buffer.h"
 #include "qemu-plugin.h"
@@ -53,7 +54,7 @@ static void add_post_reg_state(VCPU *vcpu, unsigned int vcpu_index,
         &g_array_index(current_regs, qemu_plugin_reg_descriptor, i);
     int s = qemu_plugin_read_register(reg->handle, rdata);
     assert(s == prev_reg->content->len);
-    swap_to_le(rdata->data, s, state.is_big_endian);
+    swap_to_le(rdata->data, s, HOST_BIG_ENDIAN);
     if (!memcmp(rdata->data, prev_reg->content->data, s)) {
       // No change
       // Flush byte array
@@ -82,7 +83,7 @@ static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
     g_assert(!strcmp(prev_reg->name, reg->name) &&
              prev_reg->handle == reg->handle);
     memcpy_le(prev_reg->content->data, rdata->data, prev_reg->content->len,
-              state.is_big_endian);
+              HOST_BIG_ENDIAN);
     frame_buffer_append_reg_info(fbuf, reg->name, rdata, s, OperandRead);
     // Flush byte array
     g_byte_array_set_size(rdata, 0);
@@ -341,14 +342,6 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
     qemu_plugin_outs("Pass it with 'out=<output_file>'.\n\n");
     exit(1);
   }
-  char *endianess = get_argv_val(argv, argc, "endianess");
-  if (!endianess || (strcmp(endianess, "b") && strcmp(endianess, "l"))) {
-    qemu_plugin_outs("'endianess' argument is missing or is not 'b' or 'l'.\n");
-    qemu_plugin_outs("This is required until QEMU plugins get a richer API.\n");
-    qemu_plugin_outs("Pass it with 'endianess=[b/l]'.\n\n");
-    exit(1);
-  }
-  state.is_big_endian = endianess[0] == 'b';
 
   state.target_name = g_strdup(info->target_name);
   state.frame_buffer = g_ptr_array_new();

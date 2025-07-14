@@ -171,7 +171,6 @@ typedef struct {
   GPtrArray /*<const char *>*/ *vcpu_modes; ///< Indexed by vcpu id.
 
   const char *target_name;
-  bool is_big_endian;
 } TraceState;
 
 VCPU *vcpu_new(void);
