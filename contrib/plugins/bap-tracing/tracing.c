@@ -15,10 +15,71 @@
 
 static TraceState state = {0};
 
+static void mval_to_buf(qemu_plugin_mem_value *val, uint8_t *buf) {
+  size_t mem_val_size = 0;
+  switch (val->type) {
+  case QEMU_PLUGIN_MEM_VALUE_U8:
+    buf[0] = val->data.u8;
+    mem_val_size = 1;
+    break;
+  case QEMU_PLUGIN_MEM_VALUE_U16:
+    buf[0] = (uint8_t)val->data.u16;
+    buf[1] = (uint8_t)(val->data.u16 >> 8);
+    mem_val_size = 2;
+    break;
+  case QEMU_PLUGIN_MEM_VALUE_U32:
+    buf[0] = (uint8_t)val->data.u32;
+    buf[1] = (uint8_t)(val->data.u32 >> 8);
+    buf[2] = (uint8_t)(val->data.u32 >> 16);
+    buf[3] = (uint8_t)(val->data.u32 >> 24);
+    mem_val_size = 4;
+    break;
+  case QEMU_PLUGIN_MEM_VALUE_U64:
+    for (size_t i = 0; i < 8; ++i) {
+      buf[i] = (uint8_t)(val->data.u64 >> (i * 8));
+    }
+    mem_val_size = 8;
+    break;
+  case QEMU_PLUGIN_MEM_VALUE_U128:
+    for (size_t i = 0; i < 8; ++i) {
+      buf[i] = (uint8_t)(val->data.u128.low >> (i * 8));
+    }
+    for (size_t i = 0; i < 8; ++i) {
+      buf[i + 8] = (uint8_t)(val->data.u128.high >> (i * 8));
+    }
+    mem_val_size = 16;
+    break;
+  default:
+    g_assert(false);
+  }
+  swap_to_le(buf, mem_val_size, state.is_big_endian);
+}
+
+static size_t mval_type_to_int(enum qemu_plugin_mem_value_type type) {
+  switch (type) {
+  case QEMU_PLUGIN_MEM_VALUE_U8:
+    return 8;
+  case QEMU_PLUGIN_MEM_VALUE_U16:
+    return 16;
+  case QEMU_PLUGIN_MEM_VALUE_U32:
+    return 32;
+  case QEMU_PLUGIN_MEM_VALUE_U64:
+    return 64;
+  case QEMU_PLUGIN_MEM_VALUE_U128:
+    return 128;
+  default:
+    g_assert(false);
+  }
+  return 0;
+}
+
 static void add_mem_op(VCPU *vcpu, unsigned int vcpu_index, FrameBuffer *fbuf,
                        uint64_t vaddr, qemu_plugin_mem_value *mval,
                        bool is_store) {
-  if (!frame_buffer_append_mem_info(fbuf, vaddr, mval, is_store)) {
+  size_t mval_bits = mval_type_to_int(mval->type);
+  uint8_t *buf = g_malloc(mval_bits / 8);
+  mval_to_buf(mval, buf);
+  if (!frame_buffer_append_mem_info(fbuf, vaddr, buf, mval_bits, is_store)) {
     qemu_plugin_outs("Failed to append memory info\n");
   }
   return;
@@ -54,7 +115,7 @@ static void add_post_reg_state(VCPU *vcpu, unsigned int vcpu_index,
         &g_array_index(current_regs, qemu_plugin_reg_descriptor, i);
     int s = qemu_plugin_read_register(reg->handle, rdata);
     assert(s == prev_reg->content->len);
-    swap_to_le(rdata->data, s, HOST_BIG_ENDIAN);
+    swap_to_le(rdata->data, s, state.is_big_endian);
     if (!memcmp(rdata->data, prev_reg->content->data, s)) {
       // No change
       // Flush byte array
@@ -83,8 +144,9 @@ static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
     g_assert(!strcmp(prev_reg->name, reg->name) &&
              prev_reg->handle == reg->handle);
     memcpy_le(prev_reg->content->data, rdata->data, prev_reg->content->len,
-              HOST_BIG_ENDIAN);
-    frame_buffer_append_reg_info(fbuf, reg->name, rdata, s, OperandRead);
+              state.is_big_endian);
+    frame_buffer_append_reg_info(fbuf, reg->name, prev_reg->content, s,
+                                 OperandRead);
     // Flush byte array
     g_byte_array_set_size(rdata, 0);
   }
@@ -342,6 +404,14 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
     qemu_plugin_outs("Pass it with 'out=<output_file>'.\n\n");
     exit(1);
   }
+  char *endianess = get_argv_val(argv, argc, "endianess");
+  if (!endianess || (strcmp(endianess, "b") && strcmp(endianess, "l"))) {
+    qemu_plugin_outs("'endianess' argument is missing or is not 'b' or 'l'.\n");
+    qemu_plugin_outs("This is required until QEMU plugins get a richer API.\n");
+    qemu_plugin_outs("Pass it with 'endianess=[b/l]'.\n\n");
+    exit(1);
+  }
+  state.is_big_endian = endianess[0] == 'b';
 
   state.target_name = g_strdup(info->target_name);
   state.frame_buffer = g_ptr_array_new();

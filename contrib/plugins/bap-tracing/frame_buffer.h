@@ -41,7 +41,8 @@ bool frame_buffer_new_frame_std(FrameBuffer *buf, unsigned int thread_id,
                                 uint8_t *bytes, size_t bytes_len);
 
 bool frame_buffer_append_mem_info(FrameBuffer *fbuf, uint64_t vaddr,
-                                  qemu_plugin_mem_value *mval, bool is_store);
+                                  const uint8_t *mval, size_t mval_bits,
+                                  bool is_store);
 
 /**
  * \brief Appends the given operand info to the open frame.

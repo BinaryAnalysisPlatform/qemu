@@ -36,7 +36,7 @@
 void write_meta(WLOCKED FILE *file, char **plugin_argv, size_t plugin_argc);
 char *get_argv_val(char **argv, int argc, const char *key);
 void file_exists_exit(const char *file);
-void memcpy_le(uint8_t *dst, uint8_t *src, size_t len, bool big_endian);
+void memcpy_le(uint8_t *dst, const uint8_t *src, size_t len, bool big_endian);
 void swap_to_le(uint8_t *buf, size_t len, bool big_endian);
 
 #endif

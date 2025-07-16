@@ -193,7 +193,7 @@ void write_meta(WLOCKED FILE *file, char **plugin_argv, size_t plugin_argc) {
 }
 
 /// Copies src to dst. dst will always be in little endian byte order.
-void memcpy_le(uint8_t *dst, uint8_t *src, size_t len, bool big_endian) {
+void memcpy_le(uint8_t *dst, const uint8_t *src, size_t len, bool big_endian) {
   if (!big_endian) {
     memcpy(dst, src, len);
     return;
