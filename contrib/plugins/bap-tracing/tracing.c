@@ -333,7 +333,7 @@ static void cb_trans(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
     qemu_plugin_register_vcpu_insn_exec_cb(tb_insn, log_insn_reg_access,
                                            QEMU_PLUGIN_CB_R_REGS, insn_data);
     qemu_plugin_register_vcpu_mem_cb(tb_insn, log_insn_mem_access,
-                                     QEMU_PLUGIN_CB_NO_REGS, QEMU_PLUGIN_MEM_R,
+                                     QEMU_PLUGIN_CB_NO_REGS, QEMU_PLUGIN_MEM_RW,
                                      NULL);
   }
 }
