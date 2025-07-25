@@ -404,14 +404,14 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
     qemu_plugin_outs("Pass it with 'out=<output_file>'.\n\n");
     exit(1);
   }
-  char *endianess = get_argv_val(argv, argc, "endianess");
-  if (!endianess || (strcmp(endianess, "b") && strcmp(endianess, "l"))) {
-    qemu_plugin_outs("'endianess' argument is missing or is not 'b' or 'l'.\n");
+  char *endianness = get_argv_val(argv, argc, "endianness");
+  if (!endianness || (strcmp(endianness, "b") && strcmp(endianness, "l"))) {
+    qemu_plugin_outs("'endianness' argument is missing or is not 'b' or 'l'.\n");
     qemu_plugin_outs("This is required until QEMU plugins get a richer API.\n");
-    qemu_plugin_outs("Pass it with 'endianess=[b/l]'.\n\n");
+    qemu_plugin_outs("Pass it with 'endianness=[b/l]'.\n\n");
     exit(1);
   }
-  state.is_big_endian = endianess[0] == 'b';
+  state.is_big_endian = endianness[0] == 'b';
 
   state.target_name = g_strdup(info->target_name);
   state.frame_buffer = g_ptr_array_new();

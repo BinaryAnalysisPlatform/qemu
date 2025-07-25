@@ -41,11 +41,30 @@ The plugin takes two required arguments:
 
 `bin_path`: The path to the binary emulated. Due to a [QEMU bug](https://gitlab.com/qemu-project/qemu/-/issues/3014) this cannot be inferred.
 `out`: The output file to save the trace into.
+`endianness`: The architecture endanness.
 
 ```bash
-./qemu-sparc64 -plugin file=./contrib/plugins/bap-tracing/libbap_tracing.so,bin_path=<bin_path>,out=<output-file> -d plugin <bin_path>
+./qemu-sparc64 -plugin file=buil/contrib/plugins/bap-tracing/libbap_tracing.so,bin_path=<bin_path>,out=<output-file>,endianness=[b/l] -d plugin <bin_path>
 ls <output-file>
 ```
+
+You can also use the helper shell script:
+
+```bash
+./gen-trace.sh ./build/ sparc64 b <path_to_bin>
+```
+
+> [!NOTE]
+> The trace plugin currently only generates standard frames.
+> This is due to the limitations of the QEMU plugin API.
+>
+> If the traced binary exits due to an exception it can only indirectly be observed.
+> It will produce a standard frame without any logged post register state.
+> Any completed memory read/write might still be logged.
+>
+> If you suspect this, execute the binary with the `execlog` plugin (see `gen-trace.sh`)
+> to check of the execution stops earlier than expected.
+
 
 ## Trace format
 
