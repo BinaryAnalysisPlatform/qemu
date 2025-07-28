@@ -62,7 +62,7 @@ You can also use the helper shell script:
 > It will produce a standard frame without any logged post register state.
 > Any completed memory read/write might still be logged.
 >
-> If you suspect this, execute the binary with the `execlog` plugin (see `gen-trace.sh`)
+> If you suspect this, execute the binary with the `execlog` plugin (see `gen-trace.sh` or `gen-execlog.sh`)
 > to check of the execution stops earlier than expected.
 
 

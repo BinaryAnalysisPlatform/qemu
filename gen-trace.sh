@@ -1,8 +1,8 @@
-#!/bin/sh -x
+#!/bin/sh
 
 if [ "$#" -lt 4 ]; then
   echo "$0 <build_dir> <arch> <endianess=[b/l]> <bin_path> [args...]"
-  echo "<arch> is attached to qemu-<arch>"
+  echo "<arch> is appended to qemu-<arch>"
   exit 1
 fi
 
