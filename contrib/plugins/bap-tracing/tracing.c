@@ -141,7 +141,7 @@ static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
         &g_array_index(current_regs, qemu_plugin_reg_descriptor, i);
     size_t s = qemu_plugin_read_register(reg->handle, rdata);
     Register *prev_reg = g_ptr_array_index(vcpu->registers, i);
-    g_assert(!strcmp(prev_reg->name, reg->name) &&
+    g_assert(!g_ascii_strcasecmp(prev_reg->name, reg->name) &&
              prev_reg->handle == reg->handle);
     memcpy_le(prev_reg->content->data, rdata->data, prev_reg->content->len,
               state.is_big_endian);
