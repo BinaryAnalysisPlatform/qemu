@@ -13,5 +13,6 @@
   <reg name="fsr" bitsize="64" type="uint64" regnum="83"/>
   <reg name="fprs" bitsize="64" type="uint64" regnum="84"/>
   <reg name="y" bitsize="64" type="uint64" regnum="85"/>
+  <reg name="gsr" bitsize="64" type="uint64" regnum="86"/>
 </feature>
 
