@@ -1047,8 +1047,10 @@ static void sparc_cpu_class_init(ObjectClass *oc, void *data)
     cc->disas_set_info = cpu_sparc_disas_set_info;
 
 #if defined(TARGET_SPARC64) && !defined(TARGET_ABI32)
-    cc->gdb_num_core_regs = 86;
+    cc->gdb_core_xml_file = "sparc64-core.xml";
+    cc->gdb_num_core_regs = 87;
 #else
+    cc->gdb_core_xml_file = "sparc32-core.xml";
     cc->gdb_num_core_regs = 72;
 #endif
     cc->tcg_ops = &sparc_tcg_ops;

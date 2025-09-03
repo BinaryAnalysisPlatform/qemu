@@ -7,6 +7,8 @@ endif
 
 t = []
 if get_option('plugins')
+  subdir('bap-tracing')
+
   foreach i : contrib_plugins
     if host_os == 'windows'
       t += shared_module(i, files(i + '.c') + 'win32_linker.c',

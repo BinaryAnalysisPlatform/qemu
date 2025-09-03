@@ -103,6 +103,8 @@ int sparc_cpu_gdb_read_register(CPUState *cs, GByteArray *mem_buf, int n)
         return gdb_get_regl(mem_buf, env->fprs);
     case 85:
         return gdb_get_regl(mem_buf, env->y);
+    case 86:
+        return gdb_get_regl(mem_buf, env->gsr);
     }
 #endif
     return 0;
@@ -207,6 +209,9 @@ int sparc_cpu_gdb_write_register(CPUState *cs, uint8_t *mem_buf, int n)
             break;
         case 85:
             env->y = tmp;
+            break;
+        case 86:
+            env->gsr = tmp;
             break;
         default:
             return 0;

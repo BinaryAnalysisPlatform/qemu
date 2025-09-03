@@ -1,0 +1,36 @@
+name: Build
+
+on: [pull_request, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.x
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+    - name: Install deps
+      run: |
+        sudo apt-get -y update
+        sudo apt-get install -y git libglib2.0-dev libfdt-dev libpixman-1-dev zlib1g-dev ninja-build autoconf libtool protobuf-c-compiler libprotobuf-c-dev
+    - name: Install piqi
+      run: |
+        curl -OL https://raw.github.com/alavrik/piqi-binary/master/Linux-x86_64/piqi
+        chmod +x piqi
+        sudo mv piqi /usr/local/bin
+        piqi --version
+    - name: Checkout qemu
+      uses: actions/checkout@v4
+      with:
+        repository: BinaryAnalysisPlatform/qemu
+        path: qemu
+        submodules: true
+    - name: Build for Targets
+      run: |
+        cd qemu
+        mkdir build
+        cd build
+        ../configure --enable-plugins --target-list=sparc-linux-user,sparc64-linux-user
+        ninja
