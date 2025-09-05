@@ -1,0 +1,72 @@
+<?xml version="1.0"?>
+<!-- Copyright (C) 2019 Free Software Foundation, Inc.
+
+     Copying and distribution of this file, with or without modification,
+     are permitted in any medium without royalty provided the copyright
+     notice and this notice are preserved.  -->
+
+<!DOCTYPE feature SYSTEM "gdb-target.dtd">
+<feature name="org.gnu.gdb.tricore.core">
+  <reg name="a0" bitsize="32" type="data_ptr"/>
+  <reg name="a1" bitsize="32" type="uint32"/>
+  <reg name="a2" bitsize="32" type="uint32"/>
+  <reg name="a3" bitsize="32" type="uint32"/>
+  <reg name="a4" bitsize="32" type="uint32"/>
+  <reg name="a5" bitsize="32" type="uint32"/>
+  <reg name="a6" bitsize="32" type="uint32"/>
+  <reg name="a7" bitsize="32" type="uint32"/>
+  <reg name="a8" bitsize="32" type="uint32"/>
+  <reg name="a9" bitsize="32" type="uint32"/>
+  <reg name="a10" bitsize="32" type="uint32"/>
+  <reg name="a11" bitsize="32" type="uint32"/>
+  <reg name="a12" bitsize="32" type="uint32"/>
+  <reg name="a13" bitsize="32" type="uint32"/>
+  <reg name="a14" bitsize="32" type="uint32"/>
+  <reg name="a15" bitsize="32" type="uint32"/>
+
+  <reg name="d0" bitsize="32" type="data_ptr"/>
+  <reg name="d1" bitsize="32" type="uint32"/>
+  <reg name="d2" bitsize="32" type="uint32"/>
+  <reg name="d3" bitsize="32" type="uint32"/>
+  <reg name="d4" bitsize="32" type="uint32"/>
+  <reg name="d5" bitsize="32" type="uint32"/>
+  <reg name="d6" bitsize="32" type="uint32"/>
+  <reg name="d7" bitsize="32" type="uint32"/>
+  <reg name="d8" bitsize="32" type="uint32"/>
+  <reg name="d9" bitsize="32" type="uint32"/>
+  <reg name="d10" bitsize="32" type="uint32"/>
+  <reg name="d11" bitsize="32" type="uint32"/>
+  <reg name="d12" bitsize="32" type="uint32"/>
+  <reg name="d13" bitsize="32" type="uint32"/>
+  <reg name="d14" bitsize="32" type="uint32"/>
+  <reg name="d15" bitsize="32" type="uint32"/>
+
+  <flags id="psw_flags" size="4">
+    <field name="CDC" start="0" end="6"/>
+    <field name="CDE" start="7" end="8"/>
+    <field name="C" start="31" end="31"/>
+    <field name="V" start="30" end="30"/>
+    <field name="SV" start="29" end="29"/>
+    <field name="AV" start="28" end="28"/>
+    <field name="SAV" start="27" end="27"/>
+    <field name="RM" start="24" end="25"/>
+    <field name="PRS" start="12" end="13"/>
+    <field name="IO" start="10" end="11"/>
+    <field name="IS" start="9" end="9"/>
+    <field name="GW" start="8" end="8"/>
+  </flags>
+
+  <reg name="pcxi" bitsize="32" type="data_ptr"/>
+  <reg name="psw" bitsize="32" type="psw_flags"/>
+  <reg name="pc" bitsize="32" type="code_ptr"/>
+	<reg name="syscon" bitsize="32" type="uint32"/>
+	<reg name="cpu_id" bitsize="32" type="uint32"/>
+	<reg name="core_id" bitsize="32" type="uint32"/>
+	<reg name="biv" bitsize="32" type="uint32"/>
+	<reg name="btv" bitsize="32" type="uint32"/>
+	<reg name="isp" bitsize="32" type="uint32"/>
+	<reg name="icr" bitsize="32" type="uint32"/>
+	<reg name="fcx" bitsize="32" type="uint32"/>
+	<reg name="lcx" bitsize="32" type="uint32"/>
+	<reg name="compat" bitsize="32" type="uint32"/>
+</feature>

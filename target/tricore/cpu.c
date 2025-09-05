@@ -199,6 +199,7 @@ static void tricore_cpu_class_init(ObjectClass *c, void *data)
     cc->gdb_read_register = tricore_cpu_gdb_read_register;
     cc->gdb_write_register = tricore_cpu_gdb_write_register;
     cc->gdb_num_core_regs = 44;
+    cc->gdb_core_xml_file = "tricore-core.xml";
     cc->gdb_arch_name = tricore_gdb_arch_name;
 
     cc->dump_state = tricore_cpu_dump_state;
