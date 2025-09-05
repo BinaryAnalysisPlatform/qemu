@@ -31,7 +31,11 @@ frame_proto_src = custom_target(
 )
 
 libprotobuf = dependency('libprotobuf-c')
-frame_protobuf = static_library('protobuf', [frame_proto_src], pic: true)
+frame_protobuf = static_library(
+    'protobuf',
+    [frame_proto_src],
+    dependencies: [libprotobuf],
+    pic: true)
 dep_libprotobuf = declare_dependency(
     sources : [frame_proto_src, frame_arch_h],
     link_with : [frame_protobuf],
