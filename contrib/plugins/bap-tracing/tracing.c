@@ -339,7 +339,8 @@ static void cb_trans(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
 }
 
 static void plugin_exit(qemu_plugin_id_t id, void *udata) {
-  flush_all_frame_bufs();
+  qemu_plugin_outs("Exiting plugin, flushing data...\n");
+  // flush_all_frame_bufs();
 
   g_rw_lock_writer_lock(&state.file_lock);
   g_rw_lock_reader_lock(&state.toc_entries_offsets_lock);
