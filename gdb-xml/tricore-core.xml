@@ -59,6 +59,7 @@
   <reg name="pcxi" bitsize="32" type="data_ptr"/>
   <reg name="psw" bitsize="32" type="psw_flags"/>
   <reg name="pc" bitsize="32" type="code_ptr"/>
+  <reg name="icr" bitsize="32" type="uint32"/>
 	<reg name="syscon" bitsize="32" type="uint32"/>
 	<reg name="cpu_id" bitsize="32" type="uint32"/>
 	<reg name="core_id" bitsize="32" type="uint32"/>
@@ -69,4 +70,8 @@
 	<reg name="fcx" bitsize="32" type="uint32"/>
 	<reg name="lcx" bitsize="32" type="uint32"/>
 	<reg name="compat" bitsize="32" type="uint32"/>
+  <reg name="pmucon0" bitsize="32"/>
+  <reg name="cycles" bitsize="32"/>
+  <reg name="instr" bitsize="32"/>
+  <reg name="time" bitsize="32"/>
 </feature>
