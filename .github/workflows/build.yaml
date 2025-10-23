@@ -11,6 +11,10 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.x'
+    - name: Install Python dependencies
+      run: |
+        pip install --upgrade pip
+        pip install distlib setuptools wheel
     - name: Install deps
       run: |
         sudo apt-get -y update
@@ -32,5 +36,5 @@ jobs:
         cd qemu
         mkdir build
         cd build
-        ../configure --enable-plugins --target-list=sparc-linux-user,sparc64-linux-user
+        ../configure --enable-plugins --target-list=sparc-linux-user,sparc64-linux-user,tricore-softmmu
         ninja
