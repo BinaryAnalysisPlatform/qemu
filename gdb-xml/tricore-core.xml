@@ -1,4 +1,10 @@
 <?xml version="1.0"?>
+
+<!-- Based on https://github.com/Gigallith/gdb-tricore/blob/main/gdb/features/tricore-core.xml
+     Modified according to rizin's TriCore plugin and QEMU's TriCore implementation.
+     Added several special registers (syscon, cpu_id, core_id, biv, btv, isp, fcx, lcx, compat,
+     pmucon0, cycles, instr, time). -->
+
 <!-- Copyright (C) 2019 Free Software Foundation, Inc.
 
      Copying and distribution of this file, with or without modification,
