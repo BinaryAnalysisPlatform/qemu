@@ -184,6 +184,7 @@ static void flush_and_write_toc_entry(FrameBuffer *fbuf) {
   g_rw_lock_writer_unlock(&state.file_lock);
 }
 
+static void flush_all_frame_bufs(void) __attribute__((unused));
 static void flush_all_frame_bufs(void) {
   g_rw_lock_writer_lock(&state.file_lock);
   g_rw_lock_writer_lock(&state.toc_entries_offsets_lock);
