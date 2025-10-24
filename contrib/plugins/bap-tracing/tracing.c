@@ -184,6 +184,7 @@ static void flush_and_write_toc_entry(FrameBuffer *fbuf) {
   g_rw_lock_writer_unlock(&state.file_lock);
 }
 
+static void flush_all_frame_bufs(void) __attribute__((unused));
 static void flush_all_frame_bufs(void) {
   g_rw_lock_writer_lock(&state.file_lock);
   g_rw_lock_writer_lock(&state.toc_entries_offsets_lock);
@@ -339,7 +340,37 @@ static void cb_trans(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
 }
 
 static void plugin_exit(qemu_plugin_id_t id, void *udata) {
-  flush_all_frame_bufs();
+  qemu_plugin_outs("Exiting bap-tracing plugin\n");
+  /**
+   * FIXME: flush_all_frame_bufs() is currently commented out due to an
+   * assertion failure in qemu_plugin_get_registers when used in the plugin
+   * exit callback.
+   *
+   * Root cause: When the plugin exits, current_cpu has already been set to
+   * NULL by QEMU's shutdown sequence. However, flush_all_frame_bufs() calls
+   * qemu_plugin_get_registers() (via add_post_reg_state()) to capture the
+   * final register state, which internally asserts that current_cpu is
+   * non-NULL. This causes the assertion to fail.
+   *
+   * This issue is specific to the TriCore architecture tracing but may affect
+   * other architectures as well.
+   *
+   * Potential drawbacks of commenting out this call:
+   * 1. The last few instruction frames in each vCPU's buffer may not be
+   *    written to the trace file, resulting in incomplete traces.
+   * 2. Post-execution register states for the final instructions will not
+   *    be captured, potentially losing important state information.
+   * 3. If the frame buffers have accumulated data that hasn't reached the
+   *    flush threshold, that data will be lost entirely.
+   *
+   * Possible solutions:
+   * - Modify QEMU to allow qemu_plugin_get_registers() to gracefully handle
+   *   NULL current_cpu during shutdown
+   * - Add a pre-exit flush mechanism that runs before current_cpu is cleared
+   * - Skip register state capture in flush_all_frame_bufs() when called from
+   *   plugin_exit, flushing only the instruction frames without post-state
+   */
+  // flush_all_frame_bufs();
 
   g_rw_lock_writer_lock(&state.file_lock);
   g_rw_lock_reader_lock(&state.toc_entries_offsets_lock);

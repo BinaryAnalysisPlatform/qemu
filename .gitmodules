@@ -45,4 +45,4 @@
 	url = https://gitlab.com/libvirt/libvirt-ci.git
 [submodule "contrib/plugins/bap-tracing/bap-frames"]
 	path = contrib/plugins/bap-tracing/bap-frames
-	url = git@github.com:BinaryAnalysisPlatform/bap-frames.git
+	url = https://github.com/BinaryAnalysisPlatform/bap-frames.git

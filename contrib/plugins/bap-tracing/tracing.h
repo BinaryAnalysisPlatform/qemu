@@ -104,6 +104,7 @@ static struct arch_enum_entry arch_map[] = {
     {.name = "8051", .arch = frame_arch_8051, .machine = 0},
     {.name = "sm83", .arch = frame_arch_sm83, .machine = 0},
     {.name = "hexagon", .arch = frame_arch_hexagon, .machine = 0},
+    {.name = "tricore", .arch = frame_arch_tricore, .machine = frame_mach_tricore_162},
     {.name = NULL, .arch = frame_arch_last, .machine = 0},
 };
 

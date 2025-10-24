@@ -11,6 +11,7 @@ Known to work:
 - Sparc
 - Hexagon
 - PPC
+- TriCore
 
 Needs fixes:
 
