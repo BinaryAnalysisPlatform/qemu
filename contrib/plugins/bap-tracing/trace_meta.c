@@ -9,6 +9,7 @@
 #include "frame.piqi.pb-c-patched.h"
 #include "trace_consts.h"
 #include "trace_meta.h"
+#include "trace_riscv.h"
 
 #define MD5LEN 16
 
@@ -169,6 +170,9 @@ void write_meta(WLOCKED FILE *file, char **plugin_argv, size_t plugin_argc) {
   char *host = g_strdup(g_get_host_name());
   meta.host = host;
 
+  char *isa = riscv_isa_from_elf(bin_path ? bin_path : arg_bin_path);
+  meta.isa = isa;
+
   size_t msg_size = meta_frame__get_packed_size(&meta);
   uint8_t *packed_buffer = g_malloc0(msg_size);
   uint64_t packed_size = meta_frame__pack(&meta, packed_buffer);
@@ -189,6 +193,7 @@ void write_meta(WLOCKED FILE *file, char **plugin_argv, size_t plugin_argc) {
 
   g_free(user);
   g_free(host);
+  g_free(isa);
   g_free(arg_bin_path);
 }
 
