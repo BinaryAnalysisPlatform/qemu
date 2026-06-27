@@ -40,9 +40,14 @@ bool frame_buffer_new_frame_std(FrameBuffer *buf, unsigned int thread_id,
                                 uint64_t vaddr, const char *mode_id,
                                 uint8_t *bytes, size_t bytes_len);
 
-bool frame_buffer_append_mem_info(FrameBuffer *fbuf, uint64_t vaddr,
-                                  const uint8_t *mval, size_t mval_bits,
-                                  bool is_store);
+/**
+ * \brief Appends a memory operand to the open frame.
+ *
+ * Takes ownership of \p mval and frees it even if appending fails.
+ */
+bool frame_buffer_append_mem_info_take(FrameBuffer *fbuf, uint64_t vaddr,
+                                       uint8_t *mval, size_t mval_bits,
+                                       bool is_store);
 
 /**
  * \brief Appends the given operand info to the open frame.
