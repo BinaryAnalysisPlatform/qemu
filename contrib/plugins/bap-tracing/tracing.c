@@ -79,7 +79,8 @@ static void add_mem_op(VCPU *vcpu, unsigned int vcpu_index, FrameBuffer *fbuf,
   size_t mval_bits = mval_type_to_int(mval->type);
   uint8_t *buf = g_malloc(mval_bits / 8);
   mval_to_buf(mval, buf);
-  if (!frame_buffer_append_mem_info(fbuf, vaddr, buf, mval_bits, is_store)) {
+  if (!frame_buffer_append_mem_info_take(fbuf, vaddr, buf, mval_bits,
+                                         is_store)) {
     qemu_plugin_outs("Failed to append memory info\n");
   }
   return;
@@ -107,7 +108,7 @@ static void log_insn_mem_access(unsigned int vcpu_index,
 static void add_post_reg_state(VCPU *vcpu, unsigned int vcpu_index,
                                GArray *current_regs, FrameBuffer *fbuf) {
 
-  GByteArray *rdata = g_byte_array_new();
+  g_autoptr(GByteArray) rdata = g_byte_array_new();
   for (size_t i = 0; i < current_regs->len; ++i) {
     Register *prev_reg = vcpu->registers->pdata[i];
 
@@ -135,7 +136,7 @@ static void add_post_reg_state(VCPU *vcpu, unsigned int vcpu_index,
 
 static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
                               GArray *current_regs, FrameBuffer *fbuf) {
-  GByteArray *rdata = g_byte_array_new();
+  g_autoptr(GByteArray) rdata = g_byte_array_new();
   for (size_t i = 0; i < current_regs->len; ++i) {
     qemu_plugin_reg_descriptor *reg =
         &g_array_index(current_regs, qemu_plugin_reg_descriptor, i);
@@ -153,10 +154,9 @@ static void add_pre_reg_state(VCPU *vcpu, unsigned int vcpu_index,
 }
 
 static GPtrArray *registers_init(void) {
-  GArray *reg_list = qemu_plugin_get_registers();
+  g_autoptr(GArray) reg_list = qemu_plugin_get_registers();
 
   if (reg_list->len == 0) {
-    g_array_free(reg_list, false);
     return NULL;
   }
   GPtrArray *registers = g_ptr_array_new();
@@ -202,7 +202,7 @@ static void flush_all_frame_bufs(void) {
     FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, i);
     VCPU *vcpu = g_ptr_array_index(state.vcpus, i);
     g_assert(vcpu);
-    GArray *current_regs = qemu_plugin_get_registers();
+    g_autoptr(GArray) current_regs = qemu_plugin_get_registers();
     g_assert(current_regs->len == vcpu->registers->len);
     add_post_reg_state(vcpu, i, current_regs, fbuf);
     frame_buffer_close_frame(fbuf);
@@ -240,7 +240,7 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, vcpu_index);
   VCPU *vcpu = g_ptr_array_index(state.vcpus, vcpu_index);
   g_assert(vcpu);
-  GArray *current_regs = qemu_plugin_get_registers();
+  g_autoptr(GArray) current_regs = qemu_plugin_get_registers();
   g_assert(current_regs->len == vcpu->registers->len);
 
   if (!frame_buffer_is_empty(fbuf)) {

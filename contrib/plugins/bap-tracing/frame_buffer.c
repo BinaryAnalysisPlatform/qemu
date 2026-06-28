@@ -257,10 +257,10 @@ OperandInfo *frame_init_reg_operand_info(const char *name, const uint8_t *value,
   return oi;
 }
 
-static OperandInfo *frame_init_mem_operand_info(uint64_t vaddr,
-                                                const uint8_t *mval,
-                                                size_t mval_bits,
-                                                bool is_store) {
+static OperandInfo *frame_init_mem_operand_info_take(uint64_t vaddr,
+                                                     uint8_t *mval,
+                                                     size_t mval_bits,
+                                                     bool is_store) {
   MemOperand *ro = g_new(MemOperand, 1);
   mem_operand__init(ro);
   ro->address = vaddr;
@@ -280,17 +280,20 @@ static OperandInfo *frame_init_mem_operand_info(uint64_t vaddr,
   oi->operand_info_specific = ois;
   oi->operand_usage = ou;
   oi->value.len = byte_width;
-  oi->value.data = g_malloc(oi->value.len);
-  memcpy(oi->value.data, mval, oi->value.len);
+  oi->value.data = mval;
 
   return oi;
 }
 
-bool frame_buffer_append_mem_info(FrameBuffer *fbuf, uint64_t vaddr,
-                                  const uint8_t *mval, size_t mval_bits,
-                                  bool is_store) {
+bool frame_buffer_append_mem_info_take(FrameBuffer *fbuf, uint64_t vaddr,
+                                       uint8_t *mval, size_t mval_bits,
+                                       bool is_store) {
   OperandInfo *oi =
-      frame_init_mem_operand_info(vaddr, mval, mval_bits, is_store);
+      frame_init_mem_operand_info_take(vaddr, mval, mval_bits, is_store);
   g_assert(oi);
-  return append_op_info(fbuf, oi);
+  if (!append_op_info(fbuf, oi)) {
+    free_operand(oi);
+    return false;
+  }
+  return true;
 }
