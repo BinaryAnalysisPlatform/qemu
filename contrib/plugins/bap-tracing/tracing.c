@@ -184,7 +184,6 @@ static void flush_and_write_toc_entry(FrameBuffer *fbuf) {
   g_rw_lock_writer_unlock(&state.file_lock);
 }
 
-static void flush_all_frame_bufs(void) __attribute__((unused));
 static void flush_all_frame_bufs(void) {
   g_rw_lock_writer_lock(&state.file_lock);
   g_rw_lock_writer_lock(&state.toc_entries_offsets_lock);
@@ -193,38 +192,34 @@ static void flush_all_frame_bufs(void) {
 
   FILE *file = state.file;
 
-  // Dump the rest of the frames but be mindeful about the
-  // maximum number of frames per TOC entry.
-
-  size_t total_to_write = 0;
-  for (size_t i = 0; i < state.vcpus->len; ++i) {
-    // Add post operands to last instructions.
+  /*
+   * Dump the rest of the frames, respecting the maximum number of frames per
+   * TOC entry.  This runs from the plugin atexit callback, which is not a
+   * valid register-read context, so do not call qemu_plugin_get_registers() or
+   * qemu_plugin_read_register() here.  Any currently open final frame is closed
+   * without adding post-register operands; operand-post-list is optional in the
+   * frame format anyway so this is allowed.
+   */
+  for (size_t i = 0; i < state.frame_buffer->len; ++i) {
     FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, i);
-    VCPU *vcpu = g_ptr_array_index(state.vcpus, i);
-    g_assert(vcpu);
-    g_autoptr(GArray) current_regs = qemu_plugin_get_registers();
-    g_assert(current_regs->len == vcpu->registers->len);
-    add_post_reg_state(vcpu, i, current_regs, fbuf);
-    frame_buffer_close_frame(fbuf);
 
-    total_to_write += fbuf->idx;
-  }
-
-  size_t entry_count = 0;
-  for (size_t i = 0; i < state.vcpus->len && total_to_write > 0; ++i) {
-    if (entry_count == frames_per_toc_entry) {
-      entry_count = 0;
-      uint64_t next_toc_entry = ftell(state.file);
-      g_array_append_val(state.toc_entries_offsets, next_toc_entry);
+    if (!frame_buffer_is_full(fbuf) && !frame_buffer_is_empty(fbuf)) {
+      frame_buffer_close_frame(fbuf);
     }
 
-    FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, i);
     for (size_t k = 0; k < fbuf->idx; ++k) {
+      if (state.total_num_frames > 0 &&
+          state.total_num_frames % frames_per_toc_entry == 0) {
+        size_t toc_entry = state.total_num_frames / frames_per_toc_entry;
+        if (state.toc_entries_offsets->len <= toc_entry) {
+          uint64_t next_toc_entry = ftell(file);
+          g_array_append_val(state.toc_entries_offsets, next_toc_entry);
+        }
+      }
       frame_buffer_write_frame_to_file(fbuf, file, k);
-      entry_count++;
       state.total_num_frames++;
-      total_to_write--;
     }
+    frame_buffer_clean(fbuf);
   }
 
   g_rw_lock_writer_unlock(&state.frame_buffer_lock);
@@ -341,36 +336,7 @@ static void cb_trans(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
 
 static void plugin_exit(qemu_plugin_id_t id, void *udata) {
   qemu_plugin_outs("Exiting bap-tracing plugin\n");
-  /**
-   * FIXME: flush_all_frame_bufs() is currently commented out due to an
-   * assertion failure in qemu_plugin_get_registers when used in the plugin
-   * exit callback.
-   *
-   * Root cause: When the plugin exits, current_cpu has already been set to
-   * NULL by QEMU's shutdown sequence. However, flush_all_frame_bufs() calls
-   * qemu_plugin_get_registers() (via add_post_reg_state()) to capture the
-   * final register state, which internally asserts that current_cpu is
-   * non-NULL. This causes the assertion to fail.
-   *
-   * This issue is specific to the TriCore architecture tracing but may affect
-   * other architectures as well.
-   *
-   * Potential drawbacks of commenting out this call:
-   * 1. The last few instruction frames in each vCPU's buffer may not be
-   *    written to the trace file, resulting in incomplete traces.
-   * 2. Post-execution register states for the final instructions will not
-   *    be captured, potentially losing important state information.
-   * 3. If the frame buffers have accumulated data that hasn't reached the
-   *    flush threshold, that data will be lost entirely.
-   *
-   * Possible solutions:
-   * - Modify QEMU to allow qemu_plugin_get_registers() to gracefully handle
-   *   NULL current_cpu during shutdown
-   * - Add a pre-exit flush mechanism that runs before current_cpu is cleared
-   * - Skip register state capture in flush_all_frame_bufs() when called from
-   *   plugin_exit, flushing only the instruction frames without post-state
-   */
-  // flush_all_frame_bufs();
+  flush_all_frame_bufs();
 
   g_rw_lock_writer_lock(&state.file_lock);
   g_rw_lock_reader_lock(&state.toc_entries_offsets_lock);
