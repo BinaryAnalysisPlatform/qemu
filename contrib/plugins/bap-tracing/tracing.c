@@ -50,7 +50,7 @@ static bool resolve_frame_arch_mach(const char *target_name,
 static void add_mem_op(VCPU *vcpu, unsigned int vcpu_index, FrameBuffer *fbuf,
                        uint64_t vaddr, qemu_plugin_mem_value *mval,
                        bool is_store) {
-  uint8_t *buf = g_malloc(16);
+  uint8_t *buf = g_malloc(sizeof(mval->data));
   size_t mval_bytes = bap_tracing_mem_value_to_le(mval, buf);
   if (!frame_buffer_append_mem_info_take(fbuf, vaddr, buf, mval_bytes * 8,
                                          is_store)) {
