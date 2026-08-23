@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 Aya contributors
+// SPDX-FileCopyrightText: 2026 Billow <billow.fun@gmail.com>
 // SPDX-License-Identifier: GPL-2.0-only
 
 #include <assert.h>
