@@ -56,9 +56,11 @@
 #if DATA_SIZE == 16
 # define VALUE_LOW(val) int128_getlo(val)
 # define VALUE_HIGH(val) int128_gethi(val)
+# define VALUE_EQ(left, right) int128_eq(left, right)
 #else
 # define VALUE_LOW(val) val
 # define VALUE_HIGH(val) 0
+# define VALUE_EQ(left, right) ((left) == (right))
 #endif
 
 #if DATA_SIZE >= 4
@@ -211,18 +213,30 @@ ABI_TYPE ATOMIC_NAME(cmpxchg)(CPUArchState *env, abi_ptr addr,
     DATA_TYPE ret;
 
 #if DATA_SIZE == 16
+    DATA_TYPE guest_cmp = cmpv;
+    DATA_TYPE guest_new = newv;
+    DATA_TYPE guest_ret;
+    DATA_TYPE guest_write;
+
     ret = atomic16_cmpxchg(haddr, BSWAP(cmpv), BSWAP(newv));
 #else
+    DATA_TYPE guest_cmp = cmpv;
+    DATA_TYPE guest_new = newv;
+    DATA_TYPE guest_ret;
+    DATA_TYPE guest_write;
+
     ret = qatomic_cmpxchg__nocheck(haddr, BSWAP(cmpv), BSWAP(newv));
 #endif
     ATOMIC_MMU_CLEANUP;
+    guest_ret = BSWAP(ret);
+    guest_write = VALUE_EQ(guest_ret, guest_cmp) ? guest_new : guest_ret;
     atomic_trace_rmw_post(env, addr,
-                          VALUE_LOW(ret),
-                          VALUE_HIGH(ret),
-                          VALUE_LOW(newv),
-                          VALUE_HIGH(newv),
+                          VALUE_LOW(guest_ret),
+                          VALUE_HIGH(guest_ret),
+                          VALUE_LOW(guest_write),
+                          VALUE_HIGH(guest_write),
                           oi);
-    return BSWAP(ret);
+    return guest_ret;
 }
 
 #if DATA_SIZE < 16
@@ -331,3 +345,4 @@ GEN_ATOMIC_HELPER_FN(add_fetch, ADD, DATA_TYPE, new)
 #undef SHIFT
 #undef VALUE_LOW
 #undef VALUE_HIGH
+#undef VALUE_EQ

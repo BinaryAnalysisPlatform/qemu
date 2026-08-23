@@ -44,9 +44,24 @@ dep_libprotobuf = declare_dependency(
 
 bap_tracing_src = files(
   'frame_buffer.c',
+  'machine.c',
+  'mem_value.c',
   'tracing.c',
   'trace_meta.c',
+) + qemu_version
+
+bap_tracing_machine_test = executable(
+  'test-bap-tracing-machine',
+  [files('machine.c', 'test_machine.c'), frame_arch_h],
 )
+test('bap-tracing-machine', bap_tracing_machine_test)
+
+bap_tracing_mem_value_test = executable(
+  'test-bap-tracing-mem-value',
+  files('mem_value.c', 'test_mem_value.c'),
+  include_directories: '../../../include/qemu',
+)
+test('bap-tracing-mem-value', bap_tracing_mem_value_test)
 
 if host_os == 'windows'
   plugin_modules += shared_module('bap_tracing', bap_tracing_src,

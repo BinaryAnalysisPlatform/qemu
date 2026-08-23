@@ -12,6 +12,7 @@ Known to work:
 - Hexagon
 - PPC
 - TriCore
+- M68K system emulation
 
 Needs fixes:
 
@@ -38,16 +39,25 @@ make
 
 ## Tracing a binary
 
-The plugin takes two required arguments:
+The plugin takes the following arguments:
 
 `bin_path`: The path to the binary emulated. Due to a [QEMU bug](https://gitlab.com/qemu-project/qemu/-/issues/3014) this cannot be inferred.
 `out`: The output file to save the trace into.
 `endianness`: The architecture endanness.
+`machine`: Required for M68K so the trace header identifies the exact CPU
+profile. Accepted values cover every QEMU M68K CPU model: `any`, `cfv4e`,
+`m5206`, `m5208`, `m68000`, `m68010`, `m68020`, `m68030`, `m68040`, and
+`m68060`. QEMU's synthetic `any` model uses the closest standardized BAP
+profile, `mcf_isa_b_float_emac`; all concrete models retain their specific
+profile. The argument is rejected for non-M68K targets.
 
 ```bash
 ./qemu-sparc64 -plugin file=buil/contrib/plugins/bap-tracing/libbap_tracing.so,bin_path=<bin_path>,out=<output-file>,endianness=[b/l] -d plugin <bin_path>
 ls <output-file>
 ```
+
+For example, an M68020 system trace uses
+`-plugin file=libbap_tracing.so,bin_path=<bin_path>,out=trace.frames,endianness=b,machine=m68020`.
 
 You can also use the helper shell script:
 

@@ -26,8 +26,12 @@ static struct arch_enum_entry arch_map[] = {
     {.name = "vax", .arch = frame_arch_vax, .machine = 0},
     {.name = "i960", .arch = frame_arch_i960, .machine = 0},
     {.name = "or32", .arch = frame_arch_or32, .machine = 0},
-    {.name = "sparc", .arch = frame_arch_sparc, .machine = frame_mach_sparc_v8plusa},
-    {.name = "sparc64", .arch = frame_arch_sparc, .machine = frame_mach_sparc_v9b},
+    {.name = "sparc",
+     .arch = frame_arch_sparc,
+     .machine = frame_mach_sparc_v8plusa},
+    {.name = "sparc64",
+     .arch = frame_arch_sparc,
+     .machine = frame_mach_sparc_v9b},
     {.name = "spu", .arch = frame_arch_spu, .machine = 0},
     {.name = "mips", .arch = frame_arch_mips, .machine = 0},
     {.name = "i386", .arch = frame_arch_i386, .machine = 0},
@@ -104,7 +108,9 @@ static struct arch_enum_entry arch_map[] = {
     {.name = "8051", .arch = frame_arch_8051, .machine = 0},
     {.name = "sm83", .arch = frame_arch_sm83, .machine = 0},
     {.name = "hexagon", .arch = frame_arch_hexagon, .machine = 0},
-    {.name = "tricore", .arch = frame_arch_tricore, .machine = frame_mach_tricore_162},
+    {.name = "tricore",
+     .arch = frame_arch_tricore,
+     .machine = frame_mach_tricore_162},
     {.name = NULL, .arch = frame_arch_last, .machine = 0},
 };
 
@@ -137,13 +143,13 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
 #define MAX_INSTRUCTION_SIZE 64
 
 typedef struct {
-  uint8_t bytes[MAX_INSTRUCTION_SIZE]; ///< Instruction bytes.
-  size_t size;                         ///< Len of instruction in bytes.
+  uint8_t bytes[MAX_INSTRUCTION_SIZE];  ///< Instruction bytes.
+  size_t size;  ///< Len of instruction in bytes.
   uint64_t vaddr;
 } Instruction;
 
 typedef struct {
-  struct qemu_plugin_register *handle; ///< Passed to qemu API.
+  struct qemu_plugin_register *handle;  ///< Passed to qemu API.
   GByteArray *content;
   const char *name;
 } Register;
@@ -157,7 +163,7 @@ typedef struct {
   GPtrArray /*<VCPU>*/ *vcpus;
 
   GRWLock frame_buffer_lock;
-  GPtrArray /*<FrameBuffer>*/ *frame_buffer; ///< Indexed by vcpu id
+  GPtrArray /*<FrameBuffer>*/ *frame_buffer;  ///< Indexed by vcpu id
 
   GRWLock toc_entries_offsets_lock;
   GArray /*<uint64_t>*/ *toc_entries_offsets;
@@ -169,9 +175,11 @@ typedef struct {
   FILE *file;
 
   GRWLock vcpu_mode_lock;
-  GPtrArray /*<const char *>*/ *vcpu_modes; ///< Indexed by vcpu id.
+  GPtrArray /*<const char *>*/ *vcpu_modes;  ///< Indexed by vcpu id.
 
   const char *target_name;
+  uint64_t frame_arch;
+  uint64_t frame_machine;
   bool is_big_endian;
 } TraceState;
 

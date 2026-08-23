@@ -3512,7 +3512,7 @@ DISAS_INSN(shift_reg)
 
 DISAS_INSN(shift_mem)
 {
-    int logical = insn & 8;
+    int logical = insn & 0x200;
     int left = insn & 0x100;
     TCGv src;
     TCGv addr;
@@ -3522,6 +3522,7 @@ DISAS_INSN(shift_mem)
     if (left) {
         tcg_gen_shri_i32(QREG_CC_C, src, 15);
         tcg_gen_shli_i32(QREG_CC_N, src, 1);
+        gen_ext(QREG_CC_N, QREG_CC_N, OS_WORD, 1);
 
         /*
          * Note that ColdFire always clears V,
@@ -3539,9 +3540,9 @@ DISAS_INSN(shift_mem)
         } else {
             tcg_gen_sari_i32(QREG_CC_N, src, 1);
         }
+        gen_ext(QREG_CC_N, QREG_CC_N, OS_WORD, 1);
     }
 
-    gen_ext(QREG_CC_N, QREG_CC_N, OS_WORD, 1);
     tcg_gen_andi_i32(QREG_CC_C, QREG_CC_C, 1);
     tcg_gen_mov_i32(QREG_CC_Z, QREG_CC_N);
     tcg_gen_mov_i32(QREG_CC_X, QREG_CC_C);
@@ -4730,7 +4731,7 @@ static void gen_load_fcr(DisasContext *s, TCGv res, int reg)
 {
     switch (reg) {
     case M68K_FPIAR:
-        tcg_gen_movi_i32(res, 0);
+        tcg_gen_ld_i32(res, tcg_env, offsetof(CPUM68KState, fpiar));
         break;
     case M68K_FPSR:
         gen_helper_get_fpsr(res, tcg_env);
@@ -4745,6 +4746,7 @@ static void gen_store_fcr(DisasContext *s, TCGv val, int reg)
 {
     switch (reg) {
     case M68K_FPIAR:
+        tcg_gen_st_i32(val, tcg_env, offsetof(CPUM68KState, fpiar));
         break;
     case M68K_FPSR:
         gen_helper_set_fpsr(tcg_env, val);
@@ -4953,7 +4955,7 @@ DISAS_INSN(fpu)
     case 2:
         if (insn == 0xf200 && (ext & 0xfc00) == 0x5c00) {
             /* fmovecr */
-            TCGv rom_offset = tcg_constant_i32(opmode);
+            TCGv rom_offset = tcg_constant_i32(opmode & 0x3f);
             cpu_dest = gen_fp_ptr(REG(ext, 7));
             gen_helper_fconst(tcg_env, cpu_dest, rom_offset);
             return;
@@ -5177,6 +5179,9 @@ static void gen_fcc_cond(DisasCompare *c, DisasContext *s, int cond)
 {
     TCGv fpsr;
     int imm = 0;
+
+    /* The sixth encoded bit is fixed for FScc/FTRAPcc encodings. */
+    cond &= 0x1f;
 
     /* TODO: Raise BSUN exception.  */
     fpsr = tcg_temp_new();
@@ -6037,6 +6042,21 @@ static void m68k_tr_tb_start(DisasContextBase *dcbase, CPUState *cpu)
 static void m68k_tr_insn_start(DisasContextBase *dcbase, CPUState *cpu)
 {
     DisasContext *dc = container_of(dcbase, DisasContext, base);
+
+    /*
+     * Register-reading plugin callbacks run at instruction boundaries.  Flush
+     * lazy condition codes and keep the PC in CPU state so those callbacks
+     * observe the result of the previous instruction, rather than the last TB
+     * boundary.
+     */
+    if (dc->base.plugin_enabled) {
+        TCGv cc_op = dc->cc_op == CC_OP_DYNAMIC ?
+            QREG_CC_OP : tcg_constant_i32(dc->cc_op);
+        gen_helper_flush_flags(tcg_env, cc_op);
+        dc->cc_op = CC_OP_FLAGS;
+        dc->cc_op_synced = 1;
+        tcg_gen_movi_i32(QREG_PC, dc->base.pc_next);
+    }
     tcg_gen_insn_start(dc->base.pc_next, dc->cc_op);
 }
 

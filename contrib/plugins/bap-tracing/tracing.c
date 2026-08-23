@@ -8,6 +8,8 @@
 #include "compiler.h"
 #include "frame_arch.h"
 #include "frame_buffer.h"
+#include "machine.h"
+#include "mem_value.h"
 #include "qemu-plugin.h"
 #include "trace_consts.h"
 #include "trace_meta.h"
@@ -15,71 +17,42 @@
 
 static TraceState state = {0};
 
-static void mval_to_buf(qemu_plugin_mem_value *val, uint8_t *buf) {
-  size_t mem_val_size = 0;
-  switch (val->type) {
-  case QEMU_PLUGIN_MEM_VALUE_U8:
-    buf[0] = val->data.u8;
-    mem_val_size = 1;
-    break;
-  case QEMU_PLUGIN_MEM_VALUE_U16:
-    buf[0] = (uint8_t)val->data.u16;
-    buf[1] = (uint8_t)(val->data.u16 >> 8);
-    mem_val_size = 2;
-    break;
-  case QEMU_PLUGIN_MEM_VALUE_U32:
-    buf[0] = (uint8_t)val->data.u32;
-    buf[1] = (uint8_t)(val->data.u32 >> 8);
-    buf[2] = (uint8_t)(val->data.u32 >> 16);
-    buf[3] = (uint8_t)(val->data.u32 >> 24);
-    mem_val_size = 4;
-    break;
-  case QEMU_PLUGIN_MEM_VALUE_U64:
-    for (size_t i = 0; i < 8; ++i) {
-      buf[i] = (uint8_t)(val->data.u64 >> (i * 8));
-    }
-    mem_val_size = 8;
-    break;
-  case QEMU_PLUGIN_MEM_VALUE_U128:
-    for (size_t i = 0; i < 8; ++i) {
-      buf[i] = (uint8_t)(val->data.u128.low >> (i * 8));
-    }
-    for (size_t i = 0; i < 8; ++i) {
-      buf[i + 8] = (uint8_t)(val->data.u128.high >> (i * 8));
-    }
-    mem_val_size = 16;
-    break;
-  default:
-    g_assert(false);
+static bool resolve_frame_arch_mach(const char *target_name,
+                                    const char *machine_name, uint64_t *arch,
+                                    uint64_t *machine) {
+  if (!get_frame_arch_mach(target_name, arch, machine)) {
+    return false;
   }
-  swap_to_le(buf, mem_val_size, state.is_big_endian);
-}
 
-static size_t mval_type_to_int(enum qemu_plugin_mem_value_type type) {
-  switch (type) {
-  case QEMU_PLUGIN_MEM_VALUE_U8:
-    return 8;
-  case QEMU_PLUGIN_MEM_VALUE_U16:
-    return 16;
-  case QEMU_PLUGIN_MEM_VALUE_U32:
-    return 32;
-  case QEMU_PLUGIN_MEM_VALUE_U64:
-    return 64;
-  case QEMU_PLUGIN_MEM_VALUE_U128:
-    return 128;
-  default:
-    g_assert(false);
+  if (*arch == frame_arch_m68k) {
+    if (!machine_name) {
+      qemu_plugin_outs("'machine' argument is required for M68K.\n");
+      qemu_plugin_outs(
+          "Pass machine=any/cfv4e/m5206/m5208/m68000/m68010/m68020/m68030/"
+          "m68040/m68060.\n");
+      return false;
+    }
+    if (!bap_tracing_m68k_machine(machine_name, machine)) {
+      qemu_plugin_outs("Unknown or unsupported M68K machine: ");
+      qemu_plugin_outs(machine_name);
+      qemu_plugin_outs("\n");
+      return false;
+    }
+  } else if (machine_name) {
+    qemu_plugin_outs(
+        "'machine' currently accepts only M68K CPU model names, but target "
+        "is not M68K.\n");
+    return false;
   }
-  return 0;
+  return true;
 }
 
 static void add_mem_op(VCPU *vcpu, unsigned int vcpu_index, FrameBuffer *fbuf,
                        uint64_t vaddr, qemu_plugin_mem_value *mval,
                        bool is_store) {
-  size_t mval_bits = mval_type_to_int(mval->type);
-  uint8_t *buf = g_malloc(mval_bits / 8);
-  mval_to_buf(mval, buf);
-  if (!frame_buffer_append_mem_info_take(fbuf, vaddr, buf, mval_bits,
+  uint8_t *buf = g_malloc(sizeof(mval->data));
+  size_t mval_bytes = bap_tracing_mem_value_to_le(mval, buf);
+  if (!frame_buffer_append_mem_info_take(fbuf, vaddr, buf, mval_bytes * 8,
                                          is_store)) {
     qemu_plugin_outs("Failed to append memory info\n");
   }
@@ -101,13 +74,12 @@ static void log_insn_mem_access(unsigned int vcpu_index,
 
   add_mem_op(vcpu, vcpu_index, fbuf, vaddr, &mval, is_store);
 
-  g_rw_lock_writer_unlock(&state.frame_buffer_lock);
-  g_rw_lock_writer_unlock(&state.vcpus_array_lock);
+  g_rw_lock_reader_unlock(&state.frame_buffer_lock);
+  g_rw_lock_reader_unlock(&state.vcpus_array_lock);
 }
 
 static void add_post_reg_state(VCPU *vcpu, unsigned int vcpu_index,
                                GArray *current_regs, FrameBuffer *fbuf) {
-
   g_autoptr(GByteArray) rdata = g_byte_array_new();
   for (size_t i = 0; i < current_regs->len; ++i) {
     Register *prev_reg = vcpu->registers->pdata[i];
@@ -170,59 +142,35 @@ static GPtrArray *registers_init(void) {
   return registers->len ? g_steal_pointer(&registers) : NULL;
 }
 
-static void flush_and_write_toc_entry(FrameBuffer *fbuf) {
+static void flush_frame_buffer(FrameBuffer *fbuf, bool preserve_open_frame) {
   g_rw_lock_writer_lock(&state.file_lock);
   g_rw_lock_writer_lock(&state.toc_entries_offsets_lock);
   g_rw_lock_writer_lock(&state.total_num_frames_lock);
 
-  state.total_num_frames += frame_buffer_flush_to_file(fbuf, state.file);
-  uint64_t next_toc_entry = ftell(state.file);
-  g_array_append_val(state.toc_entries_offsets, next_toc_entry);
+  Frame *open_frame = preserve_open_frame && !frame_buffer_is_full(fbuf)
+                          ? fbuf->fbuf[fbuf->idx]
+                          : NULL;
 
-  g_rw_lock_writer_unlock(&state.total_num_frames_lock);
-  g_rw_lock_writer_unlock(&state.toc_entries_offsets_lock);
-  g_rw_lock_writer_unlock(&state.file_lock);
-}
-
-static void flush_all_frame_bufs(void) {
-  g_rw_lock_writer_lock(&state.file_lock);
-  g_rw_lock_writer_lock(&state.toc_entries_offsets_lock);
-  g_rw_lock_writer_lock(&state.total_num_frames_lock);
-  g_rw_lock_writer_lock(&state.frame_buffer_lock);
-
-  FILE *file = state.file;
-
-  /*
-   * Dump the rest of the frames, respecting the maximum number of frames per
-   * TOC entry.  This runs from the plugin atexit callback, which is not a
-   * valid register-read context, so do not call qemu_plugin_get_registers() or
-   * qemu_plugin_read_register() here.  Any currently open final frame is closed
-   * without adding post-register operands; operand-post-list is optional in the
-   * frame format anyway so this is allowed.
-   */
-  for (size_t i = 0; i < state.frame_buffer->len; ++i) {
-    FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, i);
-
-    if (!frame_buffer_is_full(fbuf) && !frame_buffer_is_empty(fbuf)) {
-      frame_buffer_close_frame(fbuf);
+  for (size_t i = 0; i < fbuf->idx; i++) {
+    if (state.total_num_frames > 0 &&
+        state.total_num_frames % frames_per_toc_entry == 0) {
+      uint64_t toc_entry = ftell(state.file);
+      g_array_append_val(state.toc_entries_offsets, toc_entry);
     }
-
-    for (size_t k = 0; k < fbuf->idx; ++k) {
-      if (state.total_num_frames > 0 &&
-          state.total_num_frames % frames_per_toc_entry == 0) {
-        size_t toc_entry = state.total_num_frames / frames_per_toc_entry;
-        if (state.toc_entries_offsets->len <= toc_entry) {
-          uint64_t next_toc_entry = ftell(file);
-          g_array_append_val(state.toc_entries_offsets, next_toc_entry);
-        }
-      }
-      frame_buffer_write_frame_to_file(fbuf, file, k);
-      state.total_num_frames++;
-    }
-    frame_buffer_clean(fbuf);
+    frame_buffer_write_frame_to_file(fbuf, state.file, i);
+    state.total_num_frames++;
+  }
+  frame_buffer_clean(fbuf);
+  if (open_frame) {
+    /*
+     * At process exit, an instruction can still be open because there is no
+     * later instruction callback from which to read its post-state.  Keep it
+     * out of the trace, but preserve the buffer invariant while the exit
+     * callback finishes.  Every earlier frame is complete and safe to write.
+     */
+    fbuf->fbuf[0] = open_frame;
   }
 
-  g_rw_lock_writer_unlock(&state.frame_buffer_lock);
   g_rw_lock_writer_unlock(&state.total_num_frames_lock);
   g_rw_lock_writer_unlock(&state.toc_entries_offsets_lock);
   g_rw_lock_writer_unlock(&state.file_lock);
@@ -244,7 +192,7 @@ static void log_insn_reg_access(unsigned int vcpu_index, void *udata) {
   }
 
   if (frame_buffer_is_full(fbuf)) {
-    flush_and_write_toc_entry(fbuf);
+    flush_frame_buffer(fbuf, false);
   }
 
   // Open new one.
@@ -291,15 +239,12 @@ static void vcpu_init(qemu_plugin_id_t id, unsigned int vcpu_index) {
   FrameBuffer *vcpu_frame_buffer = frame_buffer_new();
   g_ptr_array_insert(state.frame_buffer, vcpu_index, vcpu_frame_buffer);
 
-  uint64_t frame_arch = 0;
-  uint64_t frame_mach = 0;
-  if (!get_frame_arch_mach(state.target_name, &frame_arch, &frame_mach)) {
-    qemu_plugin_outs("Failed to get arch/mach.\n");
-  }
   const char *mode = FRAME_MODE_NONE;
-  if (frame_arch == frame_arch_powerpc && frame_mach == frame_mach_ppc64) {
+  if (state.frame_arch == frame_arch_powerpc &&
+      state.frame_machine == frame_mach_ppc64) {
     mode = FRAME_MODE_PPC64;
-  } else if (frame_arch == frame_arch_powerpc && frame_mach == frame_mach_ppc) {
+  } else if (state.frame_arch == frame_arch_powerpc &&
+             state.frame_machine == frame_mach_ppc) {
     mode = FRAME_MODE_PPC32;
   }
   // TODO: handle ARM
@@ -309,6 +254,38 @@ static void vcpu_init(qemu_plugin_id_t id, unsigned int vcpu_index) {
   g_rw_lock_writer_unlock(&state.vcpu_mode_lock);
   g_rw_lock_writer_unlock(&state.frame_buffer_lock);
   g_rw_lock_writer_unlock(&state.vcpus_array_lock);
+}
+
+static void finalize_vcpu_trace(qemu_plugin_id_t id, unsigned int vcpu_index) {
+  g_rw_lock_reader_lock(&state.vcpus_array_lock);
+  g_rw_lock_writer_lock(&state.frame_buffer_lock);
+
+  if (vcpu_index >= state.vcpus->len || vcpu_index >= state.frame_buffer->len) {
+    qemu_plugin_outs("Mismatched vCPU index while finalizing trace.\n");
+    goto out;
+  }
+
+  VCPU *vcpu = g_ptr_array_index(state.vcpus, vcpu_index);
+  FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, vcpu_index);
+  if (!vcpu || !fbuf) {
+    qemu_plugin_outs("Missing vCPU state while finalizing trace.\n");
+    goto out;
+  }
+
+  if (!frame_buffer_is_empty(fbuf)) {
+    g_autoptr(GArray) current_regs = qemu_plugin_get_registers();
+    g_assert(current_regs->len == vcpu->registers->len);
+    add_post_reg_state(vcpu, vcpu_index, current_regs, fbuf);
+    frame_buffer_close_frame(fbuf);
+  }
+
+  if (fbuf->idx > 0) {
+    flush_frame_buffer(fbuf, false);
+  }
+
+out:
+  g_rw_lock_writer_unlock(&state.frame_buffer_lock);
+  g_rw_lock_reader_unlock(&state.vcpus_array_lock);
 }
 
 Instruction *init_insn(struct qemu_plugin_insn *tb_insn) {
@@ -336,10 +313,25 @@ static void cb_trans(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
 
 static void plugin_exit(qemu_plugin_id_t id, void *udata) {
   qemu_plugin_outs("Exiting bap-tracing plugin\n");
-  flush_all_frame_bufs();
+
+  /*
+   * System emulation can request shutdown from inside the current vCPU.  In
+   * that path neither the vCPU-exit nor idle callback is guaranteed to run,
+   * so complete frames below the still-open instruction would otherwise be
+   * silently dropped.  They already contain both pre- and post-state and can
+   * be committed without reading registers outside vCPU context.
+   */
+  g_rw_lock_writer_lock(&state.frame_buffer_lock);
+  for (size_t i = 0; i < state.frame_buffer->len; i++) {
+    FrameBuffer *fbuf = g_ptr_array_index(state.frame_buffer, i);
+    if (fbuf && fbuf->idx > 0) {
+      flush_frame_buffer(fbuf, true);
+    }
+  }
+  g_rw_lock_writer_unlock(&state.frame_buffer_lock);
 
   g_rw_lock_writer_lock(&state.file_lock);
-  g_rw_lock_reader_lock(&state.toc_entries_offsets_lock);
+  g_rw_lock_writer_lock(&state.toc_entries_offsets_lock);
   g_rw_lock_reader_lock(&state.total_num_frames_lock);
 
   FILE *file = state.file;
@@ -357,6 +349,16 @@ static void plugin_exit(qemu_plugin_id_t id, void *udata) {
   size_t add = state.total_num_frames % frames_per_toc_entry != 0 ? 1 : 0;
   size_t entries = ((state.total_num_frames) / frames_per_toc_entry) + add;
 
+  /*
+   * The version 3 reader expects one trailing, unused TOC entry for the final
+   * (possibly partial) block. Boundary offsets collected while writing point
+   * at frames 64, 128, ...; pad only that final entry with the end of data.
+   */
+  while (state.toc_entries_offsets->len < entries) {
+    g_array_append_val(state.toc_entries_offsets, toc_index_offset);
+  }
+  g_assert(state.toc_entries_offsets->len == entries);
+
   for (size_t i = 0; i < entries; ++i) {
     uint64_t toc_entry_off =
         g_array_index(state.toc_entries_offsets, uint64_t, i);
@@ -365,26 +367,20 @@ static void plugin_exit(qemu_plugin_id_t id, void *udata) {
   fclose(file);
 
   g_rw_lock_reader_unlock(&state.total_num_frames_lock);
-  g_rw_lock_reader_unlock(&state.toc_entries_offsets_lock);
+  g_rw_lock_writer_unlock(&state.toc_entries_offsets_lock);
   g_rw_lock_writer_unlock(&state.file_lock);
   qemu_plugin_outs("Finished trace\n");
 }
 
-static bool write_header(FILE *file, const char *target_name) {
-  uint64_t frame_arch = 0;
-  uint64_t frame_mach = 0;
-  if (!get_frame_arch_mach(target_name, &frame_arch, &frame_mach)) {
-    qemu_plugin_outs("Failed to get arch/mach.\n");
-    return false;
-  }
+static bool write_header(FILE *file, uint64_t frame_arch, uint64_t frame_mach) {
   uint64_t total_num_frames = 0ULL;
   uint64_t toc_index_offset = 0ULL;
   WRITE(magic_number);
   WRITE(trace_version);
   WRITE(frame_arch);
   WRITE(frame_mach);
-  WRITE(total_num_frames); // Gets updated later
-  WRITE(toc_index_offset); // Gets updated later
+  WRITE(total_num_frames);  // Gets updated later
+  WRITE(toc_index_offset);  // Gets updated later
   return true;
 }
 
@@ -394,21 +390,28 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
   qemu_plugin_outs("Target name: ");
   qemu_plugin_outs(info->target_name);
   qemu_plugin_outs("\n");
-  char *output = get_argv_val(argv, argc, "out");
+  g_autofree char *output = get_argv_val(argv, argc, "out");
   if (!output) {
     qemu_plugin_outs("'out' argument is missing.\n");
     qemu_plugin_outs("This is required.\n");
     qemu_plugin_outs("Pass it with 'out=<output_file>'.\n\n");
     exit(1);
   }
-  char *endianness = get_argv_val(argv, argc, "endianness");
+  g_autofree char *endianness = get_argv_val(argv, argc, "endianness");
   if (!endianness || (strcmp(endianness, "b") && strcmp(endianness, "l"))) {
-    qemu_plugin_outs("'endianness' argument is missing or is not 'b' or 'l'.\n");
+    qemu_plugin_outs(
+        "'endianness' argument is missing or is not 'b' or 'l'.\n");
     qemu_plugin_outs("This is required until QEMU plugins get a richer API.\n");
     qemu_plugin_outs("Pass it with 'endianness=[b/l]'.\n\n");
     exit(1);
   }
   state.is_big_endian = endianness[0] == 'b';
+
+  g_autofree char *machine = get_argv_val(argv, argc, "machine");
+  if (!resolve_frame_arch_mach(info->target_name, machine, &state.frame_arch,
+                               &state.frame_machine)) {
+    return 1;
+  }
 
   state.target_name = g_strdup(info->target_name);
   state.frame_buffer = g_ptr_array_new();
@@ -416,20 +419,26 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
   state.vcpus = g_ptr_array_new();
   state.vcpu_modes = g_ptr_array_new();
   state.file = fopen(output, "wb");
-  if (!(state.frame_buffer || state.vcpus || state.file ||
-        !state.toc_entries_offsets)) {
+  if (!state.frame_buffer || !state.vcpus || !state.vcpu_modes || !state.file ||
+      !state.toc_entries_offsets) {
     return 1;
   }
-  g_free(output);
-  if (!write_header(state.file, info->target_name)) {
+  if (!write_header(state.file, state.frame_arch, state.frame_machine)) {
     qemu_plugin_outs("Failed to write header.\n");
     return 1;
   }
   write_meta(state.file, argv, argc);
 
-  g_array_append_val(state.toc_entries_offsets, offset_toc_start);
-
   qemu_plugin_register_vcpu_init_cb(id, vcpu_init);
+  qemu_plugin_register_vcpu_exit_cb(id, finalize_vcpu_trace);
+  /*
+   * System emulation does not unrealize vCPUs during a normal shutdown, so
+   * the exit callback is not sufficient on its own. The idle callback runs
+   * in vCPU context after a debugger stop and can still read final register
+   * state. Reusing the idempotent finalizer here also preserves traces that
+   * never fill a complete frame buffer.
+   */
+  qemu_plugin_register_vcpu_idle_cb(id, finalize_vcpu_trace);
   qemu_plugin_register_vcpu_tb_trans_cb(id, cb_trans);
   qemu_plugin_register_atexit_cb(id, plugin_exit, NULL);
 
