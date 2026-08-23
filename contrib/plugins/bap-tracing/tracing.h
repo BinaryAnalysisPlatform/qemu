@@ -143,13 +143,13 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
 #define MAX_INSTRUCTION_SIZE 64
 
 typedef struct {
-  uint8_t bytes[MAX_INSTRUCTION_SIZE]; ///< Instruction bytes.
-  size_t size;                         ///< Len of instruction in bytes.
+  uint8_t bytes[MAX_INSTRUCTION_SIZE];  ///< Instruction bytes.
+  size_t size;  ///< Len of instruction in bytes.
   uint64_t vaddr;
 } Instruction;
 
 typedef struct {
-  struct qemu_plugin_register *handle; ///< Passed to qemu API.
+  struct qemu_plugin_register *handle;  ///< Passed to qemu API.
   GByteArray *content;
   const char *name;
 } Register;
@@ -163,7 +163,7 @@ typedef struct {
   GPtrArray /*<VCPU>*/ *vcpus;
 
   GRWLock frame_buffer_lock;
-  GPtrArray /*<FrameBuffer>*/ *frame_buffer; ///< Indexed by vcpu id
+  GPtrArray /*<FrameBuffer>*/ *frame_buffer;  ///< Indexed by vcpu id
 
   GRWLock toc_entries_offsets_lock;
   GArray /*<uint64_t>*/ *toc_entries_offsets;
@@ -175,7 +175,7 @@ typedef struct {
   FILE *file;
 
   GRWLock vcpu_mode_lock;
-  GPtrArray /*<const char *>*/ *vcpu_modes; ///< Indexed by vcpu id.
+  GPtrArray /*<const char *>*/ *vcpu_modes;  ///< Indexed by vcpu id.
 
   const char *target_name;
   uint64_t frame_arch;

@@ -24,39 +24,33 @@ int main(void) {
       0x78, 0x69, 0x5a, 0x4b, 0x3c, 0x2d, 0x1e, 0x0f,
   };
 
-  check_value(
-      (qemu_plugin_mem_value){
-          .type = QEMU_PLUGIN_MEM_VALUE_U8,
-          .data.u8 = 0xa5,
-      },
-      u8, sizeof(u8));
-  check_value(
-      (qemu_plugin_mem_value){
-          .type = QEMU_PLUGIN_MEM_VALUE_U16,
-          .data.u16 = 0x1234,
-      },
-      u16, sizeof(u16));
-  check_value(
-      (qemu_plugin_mem_value){
-          .type = QEMU_PLUGIN_MEM_VALUE_U32,
-          .data.u32 = 0x12345678,
-      },
-      u32, sizeof(u32));
-  check_value(
-      (qemu_plugin_mem_value){
-          .type = QEMU_PLUGIN_MEM_VALUE_U64,
-          .data.u64 = UINT64_C(0x0123456789abcdef),
-      },
-      u64, sizeof(u64));
-  check_value(
-      (qemu_plugin_mem_value){
-          .type = QEMU_PLUGIN_MEM_VALUE_U128,
-          .data.u128 =
-              {
-                  .low = UINT64_C(0x0123456789abcdef),
-                  .high = UINT64_C(0x0f1e2d3c4b5a6978),
+  check_value((qemu_plugin_mem_value){
+                  .type = QEMU_PLUGIN_MEM_VALUE_U8,
+                  .data.u8 = 0xa5,
               },
-      },
-      u128, sizeof(u128));
+              u8, sizeof(u8));
+  check_value((qemu_plugin_mem_value){
+                  .type = QEMU_PLUGIN_MEM_VALUE_U16,
+                  .data.u16 = 0x1234,
+              },
+              u16, sizeof(u16));
+  check_value((qemu_plugin_mem_value){
+                  .type = QEMU_PLUGIN_MEM_VALUE_U32,
+                  .data.u32 = 0x12345678,
+              },
+              u32, sizeof(u32));
+  check_value((qemu_plugin_mem_value){
+                  .type = QEMU_PLUGIN_MEM_VALUE_U64,
+                  .data.u64 = UINT64_C(0x0123456789abcdef),
+              },
+              u64, sizeof(u64));
+  check_value((qemu_plugin_mem_value){
+                  .type = QEMU_PLUGIN_MEM_VALUE_U128,
+                  .data.u128 = {
+                      .low = UINT64_C(0x0123456789abcdef),
+                      .high = UINT64_C(0x0f1e2d3c4b5a6978),
+                  },
+              },
+              u128, sizeof(u128));
   return 0;
 }

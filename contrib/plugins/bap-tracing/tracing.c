@@ -379,8 +379,8 @@ static bool write_header(FILE *file, uint64_t frame_arch, uint64_t frame_mach) {
   WRITE(trace_version);
   WRITE(frame_arch);
   WRITE(frame_mach);
-  WRITE(total_num_frames); // Gets updated later
-  WRITE(toc_index_offset); // Gets updated later
+  WRITE(total_num_frames);  // Gets updated later
+  WRITE(toc_index_offset);  // Gets updated later
   return true;
 }
 
