@@ -46,6 +46,7 @@ bap_tracing_src = files(
   'frame_buffer.c',
   'tracing.c',
   'trace_meta.c',
+  'trace_riscv.c',
 )
 
 if host_os == 'windows'
